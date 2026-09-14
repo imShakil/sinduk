@@ -18,9 +18,12 @@ import sqlite3
 import base64
 import threading
 from enum import Enum
+import hashlib
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import x25519
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.backends import default_backend
 from .log import get_logger
 
@@ -33,6 +36,13 @@ PACLI_DIR = SINDUK_DIR  # Backwards-compatibility alias
 VAULTS_DIR = os.path.join(SINDUK_DIR, VAULTS_KEY)
 REGISTRY_PATH = os.path.join(VAULTS_DIR, "vault_registry.json")
 USER_IDENTITY_PATH = os.path.join(SINDUK_DIR, "user_identity.json")
+
+BUNDLE_MAGIC = b"SINDUK1"
+BUNDLE_SALT_SIZE = 16
+INVITE_TOKEN_PREFIX = "sinduk-inv-"
+X25519_WRAP_PREFIX = b"X25519:"
+SQL_ADD_PUBLIC_KEY_COLUMN = "ALTER TABLE members ADD COLUMN public_key TEXT"
+PERMISSION_ERROR_MSG = "No user identity configured. Run 'sinduk team init' first."
 
 
 class VaultRole(str, Enum):
@@ -63,12 +73,66 @@ ROLE_PERMISSIONS = {
 }
 
 
+# ----------------------------------------------------------------------
+# Asymmetric Key Wrapping (X25519 ECDH + HKDF + Fernet)
+# ----------------------------------------------------------------------
+
+
+def wrap_vault_key_for_public_key(raw_vault_key: bytes, recipient_pub: x25519.X25519PublicKey) -> bytes:
+    """
+    Wrap a 32-byte symmetric vault key for a recipient's X25519 public key.
+
+    Uses ephemeral ECDH key agreement, derives an encryption key with HKDF-SHA256,
+    and encrypts the vault key with Fernet.
+    """
+    eph_priv = x25519.X25519PrivateKey.generate()
+    eph_pub_bytes = eph_priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    shared = eph_priv.exchange(recipient_pub)
+    derived = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=b"sinduk-vault-wrap",
+        backend=default_backend(),
+    ).derive(shared)
+    wrap_fernet = Fernet(base64.urlsafe_b64encode(derived))
+    ciphertext = wrap_fernet.encrypt(raw_vault_key)
+    return X25519_WRAP_PREFIX + eph_pub_bytes + ciphertext
+
+
+def unwrap_vault_key_with_private_key(wrapped_blob: bytes, recipient_priv: x25519.X25519PrivateKey) -> bytes:
+    """
+    Unwrap a symmetric vault key using the recipient's X25519 private key.
+    """
+    if not wrapped_blob.startswith(X25519_WRAP_PREFIX):
+        raise ValueError("Invalid asymmetric wrapped key format")
+    prefix_len = len(X25519_WRAP_PREFIX)
+    eph_pub_bytes = wrapped_blob[prefix_len : prefix_len + 32]
+    ciphertext = wrapped_blob[prefix_len + 32 :]
+    eph_pub = x25519.X25519PublicKey.from_public_bytes(eph_pub_bytes)
+    shared = recipient_priv.exchange(eph_pub)
+    derived = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=b"sinduk-vault-wrap",
+        backend=default_backend(),
+    ).derive(shared)
+    wrap_fernet = Fernet(base64.urlsafe_b64encode(derived))
+    return wrap_fernet.decrypt(ciphertext)
+
+
+# ----------------------------------------------------------------------
+# Identity & Keypair Management
+# ----------------------------------------------------------------------
+
+
 def get_user_identity() -> dict:
     """
-    Get or create a local user identity.
+    Get local user identity.
 
     Returns:
-        dict with 'user_id' and 'user_name'
+        dict with 'user_id', 'user_name', 'public_key', 'fingerprint', etc.
     """
     if os.path.exists(USER_IDENTITY_PATH):
         with open(USER_IDENTITY_PATH, "r") as f:
@@ -76,28 +140,125 @@ def get_user_identity() -> dict:
     return {}
 
 
-def set_user_identity(user_name: str) -> dict:
+def ensure_user_keypair(master_fernet: Fernet | None = None) -> dict:
     """
-    Create or update local user identity.
+    Ensure the current user identity has an X25519 keypair.
+    Upgrades legacy identities transparently.
+    """
+    identity = get_user_identity()
+    if not identity:
+        return {}
+    if "public_key" in identity and "encrypted_private_key" in identity:
+        return identity
+
+    priv = x25519.X25519PrivateKey.generate()
+    pub_bytes = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    pub_b64 = base64.urlsafe_b64encode(pub_bytes).decode()
+    fingerprint = hashlib.sha256(pub_bytes).hexdigest()[:16]
+
+    priv_bytes = priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    if master_fernet:
+        enc_priv = master_fernet.encrypt(priv_bytes).decode()
+        identity["has_fernet_enc"] = True
+    else:
+        enc_priv = base64.urlsafe_b64encode(priv_bytes).decode()
+        identity["has_fernet_enc"] = False
+
+    identity["public_key"] = pub_b64
+    identity["fingerprint"] = fingerprint
+    identity["encrypted_private_key"] = enc_priv
+    identity["updated_at"] = int(time.time())
+
+    os.makedirs(os.path.dirname(USER_IDENTITY_PATH), exist_ok=True)
+    with open(USER_IDENTITY_PATH, "w") as f:
+        json.dump(identity, f, indent=2)
+    return identity
+
+
+def get_user_private_key(master_fernet: Fernet) -> x25519.X25519PrivateKey:
+    """
+    Retrieve and decrypt the user's X25519 private key.
+    """
+    identity = get_user_identity()
+    if not identity or "encrypted_private_key" not in identity:
+        identity = ensure_user_keypair(master_fernet)
+    if not identity or "encrypted_private_key" not in identity:
+        raise RuntimeError("Failed to obtain user identity keypair")
+
+    enc_priv = identity["encrypted_private_key"]
+    if identity.get("has_fernet_enc", True):
+        try:
+            priv_bytes = master_fernet.decrypt(enc_priv.encode())
+        except Exception:
+            try:
+                priv_bytes = base64.urlsafe_b64decode(enc_priv.encode())
+                identity["encrypted_private_key"] = master_fernet.encrypt(priv_bytes).decode()
+                identity["has_fernet_enc"] = True
+                with open(USER_IDENTITY_PATH, "w") as f:
+                    json.dump(identity, f, indent=2)
+            except Exception:
+                raise PermissionError("Incorrect master password or corrupted identity key.")
+    else:
+        priv_bytes = base64.urlsafe_b64decode(enc_priv.encode())
+        identity["encrypted_private_key"] = master_fernet.encrypt(priv_bytes).decode()
+        identity["has_fernet_enc"] = True
+        with open(USER_IDENTITY_PATH, "w") as f:
+            json.dump(identity, f, indent=2)
+
+    return x25519.X25519PrivateKey.from_private_bytes(priv_bytes)
+
+
+def set_user_identity(user_name: str, master_fernet: Fernet | None = None) -> dict:
+    """
+    Create or update local user identity with an X25519 keypair.
 
     Args:
         user_name: Human-readable name for this user
+        master_fernet: User's master Fernet to encrypt private key
 
     Returns:
-        dict with 'user_id' and 'user_name'
+        dict with 'user_id', 'user_name', 'public_key', 'fingerprint'
     """
     existing = get_user_identity()
     user_id = existing.get("user_id", uuid.uuid4().hex[:12])
+
+    priv = x25519.X25519PrivateKey.generate()
+    pub_bytes = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    pub_b64 = base64.urlsafe_b64encode(pub_bytes).decode()
+    fingerprint = hashlib.sha256(pub_bytes).hexdigest()[:16]
+
+    priv_bytes = priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    if master_fernet:
+        enc_priv = master_fernet.encrypt(priv_bytes).decode()
+        has_fernet = True
+    else:
+        enc_priv = base64.urlsafe_b64encode(priv_bytes).decode()
+        has_fernet = False
+
     identity = {
         "user_id": user_id,
         "user_name": user_name,
+        "public_key": pub_b64,
+        "fingerprint": fingerprint,
+        "encrypted_private_key": enc_priv,
+        "has_fernet_enc": has_fernet,
         "created_at": existing.get("created_at", int(time.time())),
         "updated_at": int(time.time()),
     }
     os.makedirs(os.path.dirname(USER_IDENTITY_PATH), exist_ok=True)
     with open(USER_IDENTITY_PATH, "w") as f:
         json.dump(identity, f, indent=2)
-    logger.info(f"User identity set: {user_id} ({user_name})")
+    logger.info(f"User identity set: {user_id} ({user_name}), pubkey={pub_b64[:12]}...")
     return identity
 
 
@@ -224,7 +385,8 @@ class VaultManager:
                 user_name TEXT,
                 role TEXT NOT NULL DEFAULT 'viewer',
                 wrapped_key BLOB,
-                added_at INTEGER
+                added_at INTEGER,
+                public_key TEXT
             )
         """)
         conn.execute("""
@@ -238,9 +400,11 @@ class VaultManager:
             )
         """)
         # Add creator as admin
+        creator_pub = identity.get("public_key", "")
         conn.execute(
-            "INSERT INTO members (user_id, user_name, role, wrapped_key, added_at) VALUES (?, ?, ?, ?, ?)",
-            (user_id, identity["user_name"], VaultRole.ADMIN.value, wrapped_key, int(time.time())),
+            "INSERT INTO members (user_id, user_name, role, wrapped_key, added_at, public_key) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, identity["user_name"], VaultRole.ADMIN.value, wrapped_key, int(time.time()), creator_pub),
         )
         conn.commit()
         conn.close()
@@ -340,7 +504,7 @@ class VaultManager:
 
     def unlock_vault(self, name: str, master_fernet: Fernet) -> Fernet:
         """
-        Unlock a vault by unwrapping its key with the user's master Fernet.
+        Unlock a vault by unwrapping its key with the user's master Fernet or X25519 private key.
 
         Args:
             name: Vault name
@@ -361,7 +525,7 @@ class VaultManager:
 
         identity = get_user_identity()
         if not identity:
-            raise PermissionError("No user identity configured. Run 'sinduk team init' first.")
+            raise PermissionError(PERMISSION_ERROR_MSG)
 
         user_id = identity["user_id"]
         vault_dir = self._get_vault_dir(name)
@@ -383,10 +547,23 @@ class VaultManager:
         else:
             wrapped_key_bytes = bytes(wrapped_key)
 
-        try:
-            raw_vault_key = master_fernet.decrypt(wrapped_key_bytes)
-        except Exception:
-            raise PermissionError("Failed to unwrap vault key. Incorrect master password.")
+        if wrapped_key_bytes.startswith(X25519_WRAP_PREFIX):
+            priv = get_user_private_key(master_fernet)
+            raw_vault_key = unwrap_vault_key_with_private_key(wrapped_key_bytes, priv)
+            # Re-wrap locally with master_fernet for fast future unlocks
+            try:
+                local_wrapped = master_fernet.encrypt(raw_vault_key)
+                conn = sqlite3.connect(db_path)
+                conn.execute("UPDATE members SET wrapped_key = ? WHERE user_id = ?", (local_wrapped, user_id))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                logger.debug(f"Failed to cache re-wrapped key: {e}")
+        else:
+            try:
+                raw_vault_key = master_fernet.decrypt(wrapped_key_bytes)
+            except Exception:
+                raise PermissionError("Failed to unwrap vault key. Incorrect master password.")
 
         vault_fernet = Fernet(raw_vault_key)
         self._vault_fernets[name] = vault_fernet
@@ -414,6 +591,10 @@ class VaultManager:
         else:
             wrapped_key_bytes = bytes(wrapped_key)
 
+        if wrapped_key_bytes.startswith(X25519_WRAP_PREFIX):
+            priv = get_user_private_key(master_fernet)
+            return unwrap_vault_key_with_private_key(wrapped_key_bytes, priv)
+
         return master_fernet.decrypt(wrapped_key_bytes)
 
     # ------------------------------------------------------------------
@@ -424,7 +605,7 @@ class VaultManager:
         """Verify the current user has permission to perform an action."""
         identity = get_user_identity()
         if not identity:
-            raise PermissionError("No user identity configured. Run 'sinduk team init' first.")
+            raise PermissionError(PERMISSION_ERROR_MSG)
 
         user_id = identity["user_id"]
         vault_dir = self._get_vault_dir(vault_name)
@@ -451,6 +632,7 @@ class VaultManager:
         target_user_name: str,
         role: str,
         master_fernet: Fernet,
+        target_public_key: str | None = None,
     ):
         """
         Add a new member to a vault, wrapping the vault key for them.
@@ -461,6 +643,7 @@ class VaultManager:
             target_user_name: Display name for the member
             role: 'viewer', 'editor', or 'admin'
             master_fernet: Adder's master Fernet to unlock the vault key
+            target_public_key: Optional X25519 public key (Base64 string) of the member
         """
         self._check_permission(vault_name, "add_member")
 
@@ -469,11 +652,16 @@ class VaultManager:
 
         self.unlock_vault(vault_name, master_fernet)
 
-        # Get the raw vault key from adder's wrapped copy
         vault_dir = self._get_vault_dir(vault_name)
         identity = get_user_identity()
         db_path = os.path.join(vault_dir, VAULT_DB_NAME)
         conn = sqlite3.connect(db_path)
+
+        try:
+            conn.execute(SQL_ADD_PUBLIC_KEY_COLUMN)
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
         # Check if already a member
         existing = conn.execute("SELECT user_id FROM members WHERE user_id = ?", (target_user_id,)).fetchone()
@@ -483,13 +671,22 @@ class VaultManager:
 
         raw_vault_key = self.get_raw_vault_key(vault_name, master_fernet)
 
-        # Wrap the key for the new member (for now, using same key since we don't have their master pass)
-        wrapped_for_member = master_fernet.encrypt(raw_vault_key)
+        clean_pub = target_public_key.strip() if target_public_key else None
+        if clean_pub and clean_pub.startswith("x25519_pk_"):
+            clean_pub = clean_pub[len("x25519_pk_") :]
+
+        if clean_pub:
+            pub_bytes = base64.urlsafe_b64decode(clean_pub.encode())
+            rec_pub = x25519.X25519PublicKey.from_public_bytes(pub_bytes)
+            wrapped_for_member = wrap_vault_key_for_public_key(raw_vault_key, rec_pub)
+        else:
+            wrapped_for_member = master_fernet.encrypt(raw_vault_key)
 
         now = int(time.time())
         conn.execute(
-            "INSERT INTO members (user_id, user_name, role, wrapped_key, added_at) VALUES (?, ?, ?, ?, ?)",
-            (target_user_id, target_user_name, role, wrapped_for_member, now),
+            "INSERT INTO members (user_id, user_name, role, wrapped_key, added_at, public_key) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (target_user_id, target_user_name, role, wrapped_for_member, now, clean_pub or ""),
         )
         conn.commit()
         conn.close()
@@ -503,8 +700,16 @@ class VaultManager:
         )
         logger.info(f"Added member {target_user_name} ({target_user_id}) to vault '{vault_name}' as {role}")
 
-    def remove_member(self, vault_name: str, target_user_id: str):
-        """Remove a member from a vault."""
+    def remove_member(
+        self,
+        vault_name: str,
+        target_user_id: str,
+        master_fernet: Fernet | None = None,
+        rotate_key: bool = False,
+    ):
+        """
+        Remove a member from a vault and optionally rotate the vault key.
+        """
         self._check_permission(vault_name, "remove_member")
 
         identity = get_user_identity()
@@ -530,6 +735,85 @@ class VaultManager:
             f"Removed user {target_user_id}",
         )
         logger.info(f"Removed member {target_user_id} from vault '{vault_name}'")
+
+        if rotate_key and master_fernet is not None:
+            self.rotate_vault_key(vault_name, master_fernet)
+
+    def rotate_vault_key(self, vault_name: str, master_fernet: Fernet) -> dict:
+        """
+        Rotate the vault's symmetric encryption key.
+        Re-encrypts all secrets and re-wraps the new key for all remaining active members.
+        Caller must have 'rotate_key' permission (Admin).
+        """
+        self._check_permission(vault_name, "rotate_key")
+        old_fernet = self.unlock_vault(vault_name, master_fernet)
+
+        vault_dir = self._get_vault_dir(vault_name)
+        db_path = os.path.join(vault_dir, VAULT_DB_NAME)
+        conn = sqlite3.connect(db_path)
+
+        try:
+            conn.execute(SQL_ADD_PUBLIC_KEY_COLUMN)
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+
+        identity = get_user_identity()
+        user_id = identity["user_id"]
+
+        new_raw_vault_key = Fernet.generate_key()
+        new_vault_fernet = Fernet(new_raw_vault_key)
+
+        # Re-encrypt all secrets
+        rows = conn.execute("SELECT id, value_encrypted FROM secrets").fetchall()
+        for sid, old_val_enc in rows:
+            try:
+                plain = old_fernet.decrypt(old_val_enc.encode()).decode()
+            except Exception as e:
+                logger.error(f"Failed to decrypt secret {sid} during key rotation: {e}")
+                continue
+            new_val_enc = new_vault_fernet.encrypt(plain.encode()).decode()
+            conn.execute("UPDATE secrets SET value_encrypted = ? WHERE id = ?", (new_val_enc, sid))
+
+        # Re-wrap for caller
+        caller_wrapped = master_fernet.encrypt(new_raw_vault_key)
+        conn.execute("UPDATE members SET wrapped_key = ? WHERE user_id = ?", (caller_wrapped, user_id))
+
+        # Re-wrap for remaining active members
+        other_members = conn.execute(
+            "SELECT user_id, public_key FROM members WHERE user_id != ?", (user_id,)
+        ).fetchall()
+        rewrapped_count = 1
+        for m_uid, m_pub in other_members:
+            if m_pub:
+                clean_pub = m_pub.strip()
+                if clean_pub.startswith("x25519_pk_"):
+                    clean_pub = clean_pub[len("x25519_pk_") :]
+                try:
+                    pub_bytes = base64.urlsafe_b64decode(clean_pub.encode())
+                    rec_pub = x25519.X25519PublicKey.from_public_bytes(pub_bytes)
+                    m_wrapped = wrap_vault_key_for_public_key(new_raw_vault_key, rec_pub)
+                    conn.execute("UPDATE members SET wrapped_key = ? WHERE user_id = ?", (m_wrapped, m_uid))
+                    rewrapped_count += 1
+                except Exception as e:
+                    logger.warning(f"Could not re-wrap key for member {m_uid}: {e}")
+
+        conn.commit()
+        conn.close()
+
+        # Update cached fernet
+        self._vault_fernets[vault_name] = new_vault_fernet
+
+        # Log audit
+        self._log_audit(
+            vault_name,
+            user_id,
+            "rotate_key",
+            vault_name,
+            f"Rotated vault key for {len(rows)} secrets and {rewrapped_count} members",
+        )
+        logger.info(f"Vault key rotated for '{vault_name}'")
+        return {"secrets_reencrypted": len(rows), "members_rewrapped": rewrapped_count}
 
     def set_member_role(self, vault_name: str, target_user_id: str, new_role: str):
         """Change a member's role in a vault."""
@@ -565,9 +849,25 @@ class VaultManager:
         if not os.path.exists(db_path):
             return []
         conn = sqlite3.connect(db_path)
-        rows = conn.execute("SELECT user_id, user_name, role, added_at FROM members").fetchall()
-        conn.close()
-        return [{"user_id": r[0], "user_name": r[1], "role": r[2], "added_at": r[3]} for r in rows]
+        try:
+            rows = conn.execute("SELECT user_id, user_name, role, added_at, public_key FROM members").fetchall()
+            conn.close()
+            return [
+                {
+                    "user_id": r[0],
+                    "user_name": r[1],
+                    "role": r[2],
+                    "added_at": r[3],
+                    "public_key": r[4] if len(r) > 4 and r[4] else None,
+                }
+                for r in rows
+            ]
+        except sqlite3.OperationalError:
+            rows = conn.execute("SELECT user_id, user_name, role, added_at FROM members").fetchall()
+            conn.close()
+            return [
+                {"user_id": r[0], "user_name": r[1], "role": r[2], "added_at": r[3], "public_key": None} for r in rows
+            ]
 
     # ------------------------------------------------------------------
     # Vault Secrets Operations
@@ -789,7 +1089,7 @@ class VaultManager:
 
     def export_vault_backup(self, vault_name: str, backup_password: str, master_fernet: Fernet) -> bytes:
         """
-        Export all secrets in a vault to an encrypted backup blob.
+        Export all secrets in a vault to an encrypted backup blob with self-contained salt.
 
         The secrets are decrypted with the vault key and re-encrypted with
         a backup password so the file is safe to share via any channel.
@@ -800,14 +1100,12 @@ class VaultManager:
             master_fernet: User's personal Fernet (to unwrap vault key)
 
         Returns:
-            Encrypted backup bytes
+            Encrypted backup bytes with self-contained salt
         """
         self._check_permission(vault_name, "get_secret")
         vault_fernet = self.unlock_vault(vault_name, master_fernet)
 
-        from .store import get_salt
-
-        salt = get_salt()
+        salt = os.urandom(BUNDLE_SALT_SIZE)
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -851,7 +1149,8 @@ class VaultManager:
                 "secrets": records,
             }
         ).encode()
-        return backup_fernet.encrypt(payload)
+        encrypted = backup_fernet.encrypt(payload)
+        return BUNDLE_MAGIC + salt + encrypted
 
     def import_vault_backup(
         self,
@@ -879,7 +1178,13 @@ class VaultManager:
         """
         from .store import get_salt
 
-        salt = get_salt()
+        if blob.startswith(BUNDLE_MAGIC) and len(blob) > len(BUNDLE_MAGIC) + BUNDLE_SALT_SIZE:
+            salt = blob[len(BUNDLE_MAGIC) : len(BUNDLE_MAGIC) + BUNDLE_SALT_SIZE]
+            ciphertext = blob[len(BUNDLE_MAGIC) + BUNDLE_SALT_SIZE :]
+        else:
+            salt = get_salt()
+            ciphertext = blob
+
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -891,7 +1196,7 @@ class VaultManager:
         backup_fernet = Fernet(backup_key)
 
         try:
-            payload = backup_fernet.decrypt(blob)
+            payload = backup_fernet.decrypt(ciphertext)
         except Exception:
             raise ValueError("Wrong backup password or corrupted file.")
 
@@ -961,3 +1266,218 @@ class VaultManager:
             f"Imported {stats['imported']} secrets from backup",
         )
         return stats
+
+    # ------------------------------------------------------------------
+    # Team Invite & Onboarding Flow
+    # ------------------------------------------------------------------
+
+    def create_vault_invite(
+        self,
+        vault_name: str,
+        role: str,
+        master_fernet: Fernet,
+        expires_in_hours: int = 24,
+    ) -> str:
+        """
+        Create a one-time cryptographic invite token to onboard a team member.
+        """
+        self._check_permission(vault_name, "add_member")
+        if role not in [r.value for r in VaultRole]:
+            raise ValueError(f"Invalid role: {role}. Must be one of: viewer, editor, admin")
+
+        meta = self.get_vault(vault_name)
+        if not meta:
+            raise ValueError(f"Vault '{vault_name}' not found")
+
+        raw_vault_key = self.get_raw_vault_key(vault_name, master_fernet)
+        token_key = Fernet.generate_key()
+        enc_vault_key = Fernet(token_key).encrypt(raw_vault_key).decode()
+
+        identity = get_user_identity()
+        expires_at = int(time.time()) + (expires_in_hours * 3600)
+
+        payload = {
+            "v": 1,
+            "vault_name": vault_name,
+            "vault_id": meta["id"],
+            "description": meta.get("description", ""),
+            "role": role,
+            "enc_key": enc_vault_key,
+            "key": token_key.decode(),
+            "expires_at": expires_at,
+            "created_by": identity.get("user_id", ""),
+            "nonce": uuid.uuid4().hex[:8],
+        }
+
+        b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+        invite_token = INVITE_TOKEN_PREFIX + b64
+
+        self._log_audit(
+            vault_name,
+            identity.get("user_id", ""),
+            "create_invite",
+            meta["id"],
+            f"Created invite with role {role}, expires in {expires_in_hours}h",
+        )
+        return invite_token
+
+    def accept_vault_invite(self, invite_token: str, master_fernet: Fernet) -> dict:
+        """
+        Accept an invite token and initialize access to the vault.
+        """
+        if not invite_token.startswith(INVITE_TOKEN_PREFIX):
+            raise ValueError("Invalid invite token format")
+
+        raw_b64 = invite_token[len(INVITE_TOKEN_PREFIX) :]
+        pad = len(raw_b64) % 4
+        if pad:
+            raw_b64 += "=" * (4 - pad)
+
+        try:
+            payload = json.loads(base64.urlsafe_b64decode(raw_b64.encode()).decode())
+        except Exception:
+            raise ValueError("Corrupted invite token")
+
+        if time.time() > payload.get("expires_at", 0):
+            raise ValueError("This invite token has expired")
+
+        vault_name = payload["vault_name"]
+        role = payload.get("role", VaultRole.VIEWER.value)
+        token_key = payload["key"].encode()
+        enc_key = payload["enc_key"].encode()
+
+        try:
+            raw_vault_key = Fernet(token_key).decrypt(enc_key)
+        except Exception:
+            raise ValueError("Failed to decrypt vault key from invite token")
+
+        identity = get_user_identity()
+        if not identity:
+            raise PermissionError(PERMISSION_ERROR_MSG)
+        user_id = identity["user_id"]
+        user_name = identity["user_name"]
+
+        vault_dir = self._get_vault_dir(vault_name)
+        os.makedirs(vault_dir, exist_ok=True)
+        db_path = os.path.join(vault_dir, VAULT_DB_NAME)
+
+        wrapped_for_user = master_fernet.encrypt(raw_vault_key)
+
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS secrets (
+                id TEXT PRIMARY KEY,
+                label TEXT,
+                value_encrypted TEXT,
+                type TEXT,
+                created_by TEXT,
+                creation_time INTEGER,
+                update_time INTEGER
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS members (
+                user_id TEXT PRIMARY KEY,
+                user_name TEXT,
+                role TEXT NOT NULL DEFAULT 'viewer',
+                wrapped_key BLOB,
+                added_at INTEGER,
+                public_key TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                action TEXT,
+                target_id TEXT,
+                details TEXT,
+                timestamp INTEGER
+            )
+        """)
+        try:
+            conn.execute(SQL_ADD_PUBLIC_KEY_COLUMN)
+        except sqlite3.OperationalError:
+            pass
+
+        now = int(time.time())
+        conn.execute(
+            "INSERT OR REPLACE INTO members (user_id, user_name, role, wrapped_key, added_at, public_key) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, user_name, role, wrapped_for_user, now, identity.get("public_key", "")),
+        )
+        conn.commit()
+        conn.close()
+
+        # Update registry
+        vault_meta = {
+            "id": payload.get("vault_id", uuid.uuid4().hex),
+            "name": vault_name,
+            "description": payload.get("description", ""),
+            "owner": payload.get("created_by", ""),
+            "role_default": VaultRole.VIEWER.value,
+            "created_at": now,
+            "updated_at": now,
+        }
+        self._registry[VAULTS_KEY][vault_name] = vault_meta
+        self._save_registry()
+
+        # Cache in memory
+        self._vault_fernets[vault_name] = Fernet(raw_vault_key)
+
+        self._log_audit(
+            vault_name,
+            user_id,
+            "accept_invite",
+            payload.get("vault_id", ""),
+            f"{user_name} accepted invite as {role}",
+        )
+        return {
+            "vault_name": vault_name,
+            "role": role,
+            "vault_id": vault_meta["id"],
+            "description": vault_meta["description"],
+        }
+
+    # ------------------------------------------------------------------
+    # Vault Sync Status Tracking
+    # ------------------------------------------------------------------
+
+    def update_sync_status(
+        self,
+        vault_name: str,
+        last_push_at: int | None = None,
+        last_push_version: int | None = None,
+        last_push_checksum: str | None = None,
+        last_pull_at: int | None = None,
+        last_pull_version: int | None = None,
+        last_pull_checksum: str | None = None,
+    ):
+        """Update sync status tracking metadata for a vault."""
+        if vault_name not in self._registry[VAULTS_KEY]:
+            return
+        meta = self._registry[VAULTS_KEY][vault_name]
+        sync_status = meta.get("sync_status", {})
+
+        if last_push_at is not None:
+            sync_status["last_push_at"] = last_push_at
+        if last_push_version is not None:
+            sync_status["last_push_version"] = last_push_version
+        if last_push_checksum is not None:
+            sync_status["last_push_checksum"] = last_push_checksum
+
+        if last_pull_at is not None:
+            sync_status["last_pull_at"] = last_pull_at
+        if last_pull_version is not None:
+            sync_status["last_pull_version"] = last_pull_version
+        if last_pull_checksum is not None:
+            sync_status["last_pull_checksum"] = last_pull_checksum
+
+        meta["sync_status"] = sync_status
+        self._save_registry()
+
+    def get_sync_status(self, vault_name: str) -> dict:
+        """Get sync status tracking metadata for a vault."""
+        if vault_name not in self._registry[VAULTS_KEY]:
+            return {}
+        return self._registry[VAULTS_KEY][vault_name].get("sync_status", {})

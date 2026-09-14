@@ -1,7 +1,7 @@
 import os
 import sys
 import click
-from .commands.admin import init, change_master_key, version
+from .commands.admin import init, passwd, change_master_key, version
 from .commands.secrets import add, get, get_by_id, list, update, update_by_id, delete, delete_by_id
 from .commands.ssh import ssh
 from .commands.utils import export, short, cc
@@ -34,6 +34,7 @@ def cli():
 
 # Admin
 cli.add_command(init)
+cli.add_command(passwd)
 cli.add_command(change_master_key)
 cli.add_command(version)
 

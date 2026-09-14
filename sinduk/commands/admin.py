@@ -30,17 +30,14 @@ def init():
         click.echo(
             "✅ Master password is already set.\n"
             "   To reset, delete ~/.config/sinduk/salt.bin and run this command again.\n"
-            "   To change it without losing secrets, use: sinduk change-master-key"
+            "   To change it without losing secrets, use: sinduk passwd"
         )
         return
     store.set_master_password()
     click.echo("✅ Master password set. You can now add secrets.")
 
 
-@click.command()
-@master_password_required
-def change_master_key():
-    """Change the master password without losing secrets."""
+def _execute_change_master_password():
     store = SecretStore()
     store.require_fernet()
     if store.fernet is None:
@@ -78,6 +75,20 @@ def change_master_key():
     store.conn.commit()
     logger.info("Master password changed and all secrets re-encrypted.")
     click.echo("✅ Master password changed and all secrets re-encrypted.")
+
+
+@click.command()
+@master_password_required
+def passwd():
+    """Change the master password without losing secrets."""
+    _execute_change_master_password()
+
+
+@click.command(hidden=True)
+@master_password_required
+def change_master_key():
+    """Change the master password without losing secrets (alias for passwd)."""
+    _execute_change_master_password()
 
 
 @click.command()

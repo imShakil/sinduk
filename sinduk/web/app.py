@@ -881,8 +881,9 @@ def _register_vault_members_routes(app, store, vault_manager, require_auth):
     """Register vault member management endpoints."""
     _register_list_vault_members_route(app, vault_manager, require_auth)
     _register_add_vault_member_route(app, store, vault_manager, require_auth)
-    _register_remove_vault_member_route(app, vault_manager, require_auth)
+    _register_remove_vault_member_route(app, store, vault_manager, require_auth)
     _register_set_vault_member_role_route(app, vault_manager, require_auth)
+    _register_vault_crypto_routes(app, store, vault_manager, require_auth)
 
 
 def _register_list_vault_members_route(app, vault_manager, require_auth):
@@ -909,9 +910,10 @@ def _register_add_vault_member_route(app, store, vault_manager, require_auth):
             user_id = data.get("user_id", "").strip()
             user_name = data.get("user_name", "").strip()
             role = data.get("role", "viewer")
+            public_key = data.get("public_key", "").strip() or None
             if not user_id or not user_name:
                 return jsonify({"error": "user_id and user_name are required"}), 400
-            vault_manager.add_member(vault_name, user_id, user_name, role, store.fernet)
+            vault_manager.add_member(vault_name, user_id, user_name, role, store.fernet, target_public_key=public_key)
             return jsonify({"success": True, "message": f"Added {user_name} as {role}"}), 201
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
@@ -920,12 +922,14 @@ def _register_add_vault_member_route(app, store, vault_manager, require_auth):
             return jsonify({"error": str(e)}), 500
 
 
-def _register_remove_vault_member_route(app, vault_manager, require_auth):
+def _register_remove_vault_member_route(app, store, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>/members/<user_id>", methods=["DELETE"])
     @require_auth
     def remove_vault_member(vault_name, user_id):
         try:
-            vault_manager.remove_member(vault_name, user_id)
+            data = request.get_json(silent=True) or {}
+            rotate_key = data.get("rotate_key", True)
+            vault_manager.remove_member(vault_name, user_id, master_fernet=store.fernet, rotate_key=rotate_key)
             return jsonify({"success": True, "message": "Member removed"})
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
@@ -947,6 +951,51 @@ def _register_set_vault_member_role_route(app, vault_manager, require_auth):
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
         except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+
+def _register_vault_crypto_routes(app, store, vault_manager, require_auth):
+    @app.route("/api/vaults/<vault_name>/rotate-key", methods=["POST"])
+    @require_auth
+    def rotate_vault_key_route(vault_name):
+        try:
+            res = vault_manager.rotate_vault_key(vault_name, store.fernet)
+            return jsonify({"success": True, "details": res})
+        except (PermissionError, ValueError) as e:
+            return jsonify({"error": str(e)}), 403
+        except Exception as e:
+            logger.error(f"Error rotating vault key: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/vaults/<vault_name>/invite", methods=["POST"])
+    @require_auth
+    def create_vault_invite_route(vault_name):
+        try:
+            data = request.get_json() or {}
+            role = data.get("role", "viewer")
+            expires_hours = data.get("expires_hours", 24)
+            token = vault_manager.create_vault_invite(vault_name, role, store.fernet, expires_in_hours=expires_hours)
+            return jsonify({"success": True, "token": token, "role": role, "expires_hours": expires_hours})
+        except (PermissionError, ValueError) as e:
+            return jsonify({"error": str(e)}), 403
+        except Exception as e:
+            logger.error(f"Error creating vault invite: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/vaults/accept-invite", methods=["POST"])
+    @require_auth
+    def accept_vault_invite_route():
+        try:
+            data = request.get_json() or {}
+            token = data.get("token", "").strip()
+            if not token:
+                return jsonify({"error": "Invite token is required"}), 400
+            res = vault_manager.accept_vault_invite(token, store.fernet)
+            return jsonify({"success": True, "vault": res})
+        except (PermissionError, ValueError) as e:
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            logger.error(f"Error accepting vault invite: {e}")
             return jsonify({"error": str(e)}), 500
 
 

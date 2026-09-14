@@ -15,6 +15,8 @@ from .log import get_logger
 
 CONFIG_DIR = os.path.expanduser("~/.config/sinduk")
 LEGACY_CONFIG_DIR = os.path.expanduser("~/.config/pacli")
+BUNDLE_MAGIC = b"SINDUK1"
+BUNDLE_SALT_SIZE = 16
 
 
 def migrate_legacy_config(src=LEGACY_CONFIG_DIR, dst=CONFIG_DIR):
@@ -316,13 +318,13 @@ class SecretStore:
     def export_encrypted_backup(self, backup_password: str) -> bytes:
         """
         Serialise all secrets to JSON, then encrypt with a separate
-        backup password derived from the same salt.
-        Safe to upload to cloud storage.
+        backup password derived from a fresh self-contained salt.
+        Safe to upload to cloud storage and restore on any device.
         """
         import json
 
         fernet = self.require_fernet()
-        salt = get_salt()
+        salt = os.urandom(BUNDLE_SALT_SIZE)
         backup_fernet = self._derive_fernet(backup_password, salt)
 
         records = []
@@ -346,14 +348,15 @@ class SecretStore:
             )
 
         payload = json.dumps(records).encode()
-        return backup_fernet.encrypt(payload)
+        encrypted = backup_fernet.encrypt(payload)
+        return BUNDLE_MAGIC + salt + encrypted
 
     def import_encrypted_backup(self, blob: bytes, backup_password: str, merge: bool = True) -> dict:
         """
         Decrypt a backup blob and import secrets.
 
         Args:
-            blob: Encrypted backup bytes (.pacli file)
+            blob: Encrypted backup bytes (.sinduk or .pacli file)
             backup_password: Password used when backup was created
             merge: True = skip duplicates; False = overwrite
 
@@ -363,11 +366,17 @@ class SecretStore:
         import json
 
         fernet = self.require_fernet()
-        salt = get_salt()
+        if blob.startswith(BUNDLE_MAGIC) and len(blob) > len(BUNDLE_MAGIC) + BUNDLE_SALT_SIZE:
+            salt = blob[len(BUNDLE_MAGIC) : len(BUNDLE_MAGIC) + BUNDLE_SALT_SIZE]
+            ciphertext = blob[len(BUNDLE_MAGIC) + BUNDLE_SALT_SIZE :]
+        else:
+            salt = get_salt()
+            ciphertext = blob
+
         backup_fernet = self._derive_fernet(backup_password, salt)
 
         try:
-            payload = backup_fernet.decrypt(blob)
+            payload = backup_fernet.decrypt(ciphertext)
         except Exception:
             raise ValueError("Wrong backup password or corrupted file.")
 

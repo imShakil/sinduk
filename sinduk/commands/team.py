@@ -32,12 +32,19 @@ def team_init():
         if not click.confirm("Do you want to update your identity?"):
             return
 
+    store = SecretStore()
+    fernet = store.fernet if store.is_master_set() and hasattr(store, "fernet") else None
+
     user_name = click.prompt("Enter your display name (e.g., 'John Doe')")
-    identity = set_user_identity(user_name)
+    identity = set_user_identity(user_name, master_fernet=fernet)
     click.echo("\n✅ Identity set!")
-    click.echo(f"   User ID:   {identity['user_id']}")
-    click.echo(f"   Name:      {identity['user_name']}")
-    click.echo("\n💡 Share your User ID with team members so they can add you to vaults.")
+    click.echo(f"   User ID:     {identity['user_id']}")
+    click.echo(f"   Name:        {identity['user_name']}")
+    if identity.get("public_key"):
+        click.echo(f"   Public Key:  x25519_pk_{identity['public_key']}")
+        click.echo(f"   Fingerprint: {identity.get('fingerprint', '—')}")
+    click.echo("\n💡 Run 'sinduk team whoami' or 'sinduk team id' to view your identity.")
+    click.echo("   Teammates can invite you using 'sinduk team invite' or 'sinduk team add-member'.")
 
 
 @team.command("whoami")
@@ -47,10 +54,38 @@ def team_whoami():
     if not identity:
         click.echo(NO_IDENTITY_MSG)
         return
-    click.echo(f"👤 User ID:   {identity['user_id']}")
-    click.echo(f"   Name:      {identity['user_name']}")
+    click.echo(f"👤 User ID:     {identity['user_id']}")
+    click.echo(f"   Name:        {identity['user_name']}")
+    if identity.get("public_key"):
+        click.echo(f"   Public Key:  x25519_pk_{identity['public_key']}")
+        click.echo(f"   Fingerprint: {identity.get('fingerprint', '—')}")
     cstr = datetime.datetime.fromtimestamp(identity.get("created_at", 0)).strftime("%Y-%m-%d %H:%M:%S")
-    click.echo(f"   Created:   {cstr}")
+    click.echo(f"   Created:     {cstr}")
+
+
+@team.command("id")
+@click.option("--copy", "-c", is_flag=True, default=False, help="Copy public key to clipboard.")
+def team_id(copy):
+    """Show your public identity for team onboarding."""
+    identity = get_user_identity()
+    if not identity:
+        click.echo(NO_IDENTITY_MSG)
+        return
+    pub = identity.get("public_key", "")
+    full_pub = f"x25519_pk_{pub}" if pub else ""
+    click.echo(f"📋 User ID:    {identity['user_id']}")
+    click.echo(f"   Name:       {identity['user_name']}")
+    click.echo(f"   Public Key: {full_pub or '—'}")
+    if identity.get("fingerprint"):
+        click.echo(f"   Fingerprint:{identity['fingerprint']}")
+    if copy and full_pub:
+        try:
+            import pyperclip
+
+            pyperclip.copy(full_pub)
+            click.echo("\n📋 Public key copied to clipboard!")
+        except Exception:
+            logger.info("Failed to copy public key to clipboard.")
 
 
 @team.command("create-vault")
@@ -119,6 +154,30 @@ def list_vaults():
         )
 
 
+def _display_sync_status(sync_st: dict) -> None:
+    """Print vault sync status details if available."""
+    if not sync_st:
+        return
+    click.echo("\n🔄 Sync Status:")
+    if sync_st.get("last_push_at"):
+        pstr = datetime.datetime.fromtimestamp(sync_st["last_push_at"]).strftime("%Y-%m-%d %H:%M:%S")
+        vstr = f" (v{sync_st['last_push_version']})" if sync_st.get("last_push_version") else ""
+        click.echo(f"   Last Pushed:  {pstr}{vstr}")
+    if sync_st.get("last_pull_at"):
+        plstr = datetime.datetime.fromtimestamp(sync_st["last_pull_at"]).strftime("%Y-%m-%d %H:%M:%S")
+        vstr = f" (v{sync_st['last_pull_version']})" if sync_st.get("last_pull_version") else ""
+        click.echo(f"   Last Pulled:  {plstr}{vstr}")
+
+
+def _display_members(members: list) -> None:
+    """Print member list for a vault."""
+    click.echo(f"\n👥 Members ({len(members)}):")
+    for m in members:
+        astr = datetime.datetime.fromtimestamp(m.get("added_at", 0)).strftime("%Y-%m-%d") if m.get("added_at") else ""
+        pub_info = " [PK]" if m.get("public_key") else ""
+        click.echo(f"   • {m['user_name']} ({m['user_id']}){pub_info}  —  {m['role']}  (since {astr})")
+
+
 @team.command("vault-info")
 @click.argument("name")
 def vault_info(name):
@@ -136,11 +195,8 @@ def vault_info(name):
     cstr = datetime.datetime.fromtimestamp(meta.get("created_at", 0)).strftime("%Y-%m-%d %H:%M:%S")
     click.echo(f"   Created:      {cstr}")
 
-    members = vm.list_members(name)
-    click.echo(f"\n👥 Members ({len(members)}):")
-    for m in members:
-        astr = datetime.datetime.fromtimestamp(m.get("added_at", 0)).strftime("%Y-%m-%d") if m.get("added_at") else ""
-        click.echo(f"   • {m['user_name']} ({m['user_id']})  —  {m['role']}  (since {astr})")
+    _display_sync_status(meta.get("sync_status", {}))
+    _display_members(vm.list_members(name))
 
 
 @team.command("add-member")
@@ -155,8 +211,9 @@ def vault_info(name):
     show_default=True,
     help="Role for the new member.",
 )
+@click.option("--pubkey", "-k", "public_key", default=None, help="Member's X25519 public key.")
 @master_password_required
-def add_member(vault_name, user_id, user_name, role):
+def add_member(vault_name, user_id, user_name, role, public_key):
     """Add a member to a vault.
 
     VAULT_NAME is the name of the vault. USER_ID is the member's user ID
@@ -171,7 +228,7 @@ def add_member(vault_name, user_id, user_name, role):
 
     vm = VaultManager()
     try:
-        vm.add_member(vault_name, user_id, user_name, role, fernet)
+        vm.add_member(vault_name, user_id, user_name, role, fernet, target_public_key=public_key)
         click.echo(f"✅ Added {user_name} ({user_id}) to vault '{vault_name}' as {role}.")
     except (ValueError, PermissionError, RuntimeError) as e:
         click.echo(f"❌ {e}")
@@ -180,19 +237,107 @@ def add_member(vault_name, user_id, user_name, role):
 @team.command("remove-member")
 @click.argument("vault_name")
 @click.argument("user_id")
+@click.option("--rotate-key/--no-rotate-key", default=True, help="Rotate vault key upon removal.")
 @master_password_required
-def remove_member(vault_name, user_id):
-    """Remove a member from a vault."""
+def remove_member(vault_name, user_id, rotate_key):
+    """Remove a member from a vault and optionally rotate the vault key."""
     store = SecretStore()
-    store.require_fernet()
+    fernet = store.require_fernet()
 
     vm = VaultManager()
     try:
         if not click.confirm(f"Remove user '{user_id}' from vault '{vault_name}'?"):
             click.echo("Cancelled.")
             return
-        vm.remove_member(vault_name, user_id)
+        vm.remove_member(vault_name, user_id, master_fernet=fernet, rotate_key=rotate_key)
         click.echo(f"✅ Removed {user_id} from vault '{vault_name}'.")
+        if rotate_key:
+            click.echo("🔄 Vault encryption key was automatically rotated to revoke removed member's access.")
+    except (ValueError, PermissionError) as e:
+        click.echo(f"❌ {e}")
+
+
+@team.command("rotate-key")
+@click.argument("vault_name")
+@master_password_required
+def rotate_key_cmd(vault_name):
+    """Rotate the symmetric encryption key for a vault.
+
+    Re-encrypts all secrets in the vault with a fresh key and
+    re-wraps the new key for all remaining active members.
+    Requires admin role.
+    """
+    store = SecretStore()
+    fernet = store.require_fernet()
+
+    vm = VaultManager()
+    try:
+        if not click.confirm(f"Rotate encryption key for vault '{vault_name}'? This will re-encrypt all secrets."):
+            click.echo("Cancelled.")
+            return
+        res = vm.rotate_vault_key(vault_name, fernet)
+        click.echo(f"✅ Key rotated successfully for vault '{vault_name}'!")
+        click.echo(f"   Secrets re-encrypted: {res['secrets_reencrypted']}")
+        click.echo(f"   Members re-wrapped:   {res['members_rewrapped']}")
+    except (ValueError, PermissionError) as e:
+        click.echo(f"❌ {e}")
+
+
+@team.command("invite")
+@click.argument("vault_name")
+@click.option(
+    "--role",
+    "-r",
+    type=click.Choice(["viewer", "editor", "admin"]),
+    default="viewer",
+    show_default=True,
+    help="Role to grant via this invite.",
+)
+@click.option(
+    "--expires",
+    "-e",
+    "expires_hours",
+    type=int,
+    default=24,
+    show_default=True,
+    help="Expiration time in hours.",
+)
+@master_password_required
+def invite_cmd(vault_name, role, expires_hours):
+    """Generate a one-time cryptographic invite token to onboard a member."""
+    store = SecretStore()
+    fernet = store.require_fernet()
+
+    vm = VaultManager()
+    try:
+        token = vm.create_vault_invite(vault_name, role, fernet, expires_in_hours=expires_hours)
+        click.echo(f"\n📨 Invite token created for vault '{vault_name}' (Role: {role}, Expires in {expires_hours}h):")
+        click.echo(f"\n{token}\n")
+        click.echo("💡 Share this token with your teammate via Slack, email, or chat.")
+        click.echo("   They can accept it by running:")
+        click.echo("   sinduk team accept <token>")
+    except (ValueError, PermissionError) as e:
+        click.echo(f"❌ {e}")
+
+
+@team.command("accept")
+@click.argument("invite_token")
+@master_password_required
+def accept_cmd(invite_token):
+    """Accept an invite token to join a shared team vault."""
+    store = SecretStore()
+    fernet = store.require_fernet()
+
+    vm = VaultManager()
+    try:
+        res = vm.accept_vault_invite(invite_token, fernet)
+        click.echo(f"\n🎉 Successfully joined vault '{res['vault_name']}'!")
+        click.echo(f"   Your Role:   {res['role']}")
+        click.echo(f"   Vault ID:    {res['vault_id']}")
+        if res.get("description"):
+            click.echo(f"   Description: {res['description']}")
+        click.echo(f"\n💡 Use 'sinduk list --vault {res['vault_name']}' to view secrets.")
+        click.echo(f"   Use 'sinduk sync pull {res['vault_name']}' to sync latest changes.")
     except (ValueError, PermissionError) as e:
         click.echo(f"❌ {e}")
 

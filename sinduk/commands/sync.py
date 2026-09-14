@@ -95,6 +95,12 @@ def _pull_from_server_handler(vault_name: str, server_url: str, token: str, stor
 
         vm = VaultManager()
         stats = vm.import_vault_backup(vault_name, blob, token, store_fernet, merge=not overwrite)
+        vm.update_sync_status(
+            vault_name,
+            last_pull_at=int(time.time()),
+            last_pull_version=meta.get("version"),
+            last_pull_checksum=meta.get("checksum"),
+        )
 
         v_str = f"v{meta['version']}" if meta.get("version") else ""
         by_str = f"by {meta['updated_by']}" if meta.get("updated_by") else ""
@@ -136,6 +142,7 @@ def _pull_from_filesystem_handler(
 
         vm = VaultManager()
         stats = vm.import_vault_backup(vault_name, blob, sync_password, store_fernet, merge=not overwrite)
+        vm.update_sync_status(vault_name, last_pull_at=int(time.time()))
 
         click.echo(
             f"✅ Pulled vault '{vault_name}': {stats['imported']} imported, "
@@ -157,6 +164,12 @@ def _push_to_server_handler(vault_name: str, server_url: str, token: str, store_
         identity = get_user_identity()
         user_name = identity.get("user_name", "")
         res = push_to_server(vault_name, blob, server_url, token, user_name=user_name)
+        vm.update_sync_status(
+            vault_name,
+            last_push_at=int(time.time()),
+            last_push_version=res.get("version"),
+            last_push_checksum=res.get("checksum"),
+        )
         if res.get("updated"):
             click.echo(f"✅ Pushed vault '{vault_name}' (version {res['version']}) to server successfully!")
         else:
@@ -187,6 +200,7 @@ def _push_to_filesystem_handler(vault_name: str, target_path: str, sync_password
         with open(filepath, "wb") as f:
             f.write(blob)
 
+        vm.update_sync_status(vault_name, last_push_at=int(time.time()))
         click.echo(f"✅ Pushed vault '{vault_name}' to: {filepath}")
         click.echo(f"   File size: {len(blob)} bytes (encrypted)")
         logger.info(f"Vault '{vault_name}' exported to {filepath}")
@@ -199,6 +213,19 @@ def _push_to_filesystem_handler(vault_name: str, target_path: str, sync_password
 
 def _status_server_handler(vault_name: str, server_url: str, token: str):
     try:
+        vm = VaultManager()
+        local_st = vm.get_sync_status(vault_name)
+        if local_st:
+            click.echo(f"🏠 Local status for '{vault_name}':")
+            if local_st.get("last_push_at"):
+                lp_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(local_st["last_push_at"]))
+                v_str = f" (v{local_st['last_push_version']})" if local_st.get("last_push_version") else ""
+                click.echo(f"   Last pushed: {lp_str}{v_str}")
+            if local_st.get("last_pull_at"):
+                lpl_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(local_st["last_pull_at"]))
+                v_str = f" (v{local_st['last_pull_version']})" if local_st.get("last_pull_version") else ""
+                click.echo(f"   Last pulled: {lpl_str}{v_str}")
+
         status = get_server_status(vault_name, server_url, token)
         size_kb = (status.get("size") or 0) / 1024
         mod_time = (
@@ -206,7 +233,7 @@ def _status_server_handler(vault_name: str, server_url: str, token: str):
             if status.get("updated_at")
             else "—"
         )
-        click.echo(f"📦 Server status for vault '{vault_name}':")
+        click.echo(f"\n📦 Remote server status for vault '{vault_name}':")
         click.echo(f"   Server:     {server_url}")
         click.echo(f"   Version:    {status.get('version', 1)}")
         click.echo(f"   Size:       {size_kb:.1f} KB")
@@ -229,11 +256,22 @@ def _status_filesystem_handler(vault_name: str, sync_path: str):
             click.echo(f"📭 No sync file found for vault '{vault_name}' at {sync_path}")
             return
 
+    vm = VaultManager()
+    local_st = vm.get_sync_status(vault_name)
+    if local_st:
+        click.echo(f"🏠 Local status for '{vault_name}':")
+        if local_st.get("last_push_at"):
+            lp_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(local_st["last_push_at"]))
+            click.echo(f"   Last pushed: {lp_str}")
+        if local_st.get("last_pull_at"):
+            lpl_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(local_st["last_pull_at"]))
+            click.echo(f"   Last pulled: {lpl_str}")
+
     stat = os.stat(filepath)
     size_kb = stat.st_size / 1024
     mod_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_mtime))
 
-    click.echo(f"📦 Sync file for vault '{vault_name}':")
+    click.echo(f"\n📦 Sync file for vault '{vault_name}':")
     click.echo(f"   Path:     {filepath}")
     click.echo(f"   Size:     {size_kb:.1f} KB")
     click.echo(f"   Modified: {mod_time}")

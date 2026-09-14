@@ -258,11 +258,17 @@ def test_import_backup_counts_record_errors(monkeypatch, tmp_path):
 
     import json
 
-    salt = store_module.get_salt()
+    if blob.startswith(store_module.BUNDLE_MAGIC):
+        salt = blob[len(store_module.BUNDLE_MAGIC) : len(store_module.BUNDLE_MAGIC) + store_module.BUNDLE_SALT_SIZE]
+        raw_blob = blob[len(store_module.BUNDLE_MAGIC) + store_module.BUNDLE_SALT_SIZE :]
+    else:
+        salt = store_module.get_salt()
+        raw_blob = blob
     backup_fernet = source._derive_fernet("backup-pass", salt)
-    records = json.loads(backup_fernet.decrypt(blob).decode())
+    records = json.loads(backup_fernet.decrypt(raw_blob).decode())
     records.append({"id": "broken-id", "label": "x", "type": "token", "creation_time": 1, "update_time": 1})
-    tampered_blob = backup_fernet.encrypt(json.dumps(records).encode())
+    enc = backup_fernet.encrypt(json.dumps(records).encode())
+    tampered_blob = store_module.BUNDLE_MAGIC + salt + enc if blob.startswith(store_module.BUNDLE_MAGIC) else enc
 
     target = _build_store(store_module, tmp_path / "dst_err", password="master2")
     stats = target.import_encrypted_backup(tampered_blob, "backup-pass", merge=True)
