@@ -2,7 +2,7 @@
 
 import pytest
 
-from pacli.validators import (
+from sinduk.validators import (
     MAX_LABEL_LENGTH,
     MAX_PASSWORD_LENGTH,
     MAX_SECRET_BYTES,

@@ -1,5 +1,5 @@
 def test_state_file_save_load_and_clear(monkeypatch, tmp_path):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     monkeypatch.setattr(web_cmd, "WEB_STATE_DIR", str(tmp_path))
     monkeypatch.setattr(web_cmd, "WEB_PID_PATH", str(tmp_path / "webui.pid"))
@@ -18,7 +18,7 @@ def test_state_file_save_load_and_clear(monkeypatch, tmp_path):
 
 
 def test_get_pid_from_file_invalid_values(monkeypatch, tmp_path):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     monkeypatch.setattr(web_cmd, "WEB_PID_PATH", str(tmp_path / "webui.pid"))
 
@@ -32,7 +32,7 @@ def test_get_pid_from_file_invalid_values(monkeypatch, tmp_path):
 
 
 def test_load_state_invalid_json(monkeypatch, tmp_path):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     monkeypatch.setattr(web_cmd, "WEB_STATE_PATH", str(tmp_path / "webui_state.json"))
     (tmp_path / "webui_state.json").write_text("{broken", encoding="utf-8")
@@ -41,7 +41,7 @@ def test_load_state_invalid_json(monkeypatch, tmp_path):
 
 
 def test_pid_owned_by_current_user(monkeypatch):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     monkeypatch.setattr(web_cmd.os.path, "exists", lambda p: True)
 
@@ -57,7 +57,7 @@ def test_pid_owned_by_current_user(monkeypatch):
 
 
 def test_is_expected_web_process(monkeypatch, tmp_path):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     cmdline_file = tmp_path / "cmdline"
     cmdline_file.write_bytes(b"python\x00-m\x00pacli.commands.web\x00_run_server\x00")
@@ -75,7 +75,7 @@ def test_is_expected_web_process(monkeypatch, tmp_path):
 
 
 def test_start_already_running_uses_state(monkeypatch, tmp_path, capsys):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     pid_file = tmp_path / "webui.pid"
     pid_file.write_text("777", encoding="utf-8")
@@ -91,7 +91,7 @@ def test_start_already_running_uses_state(monkeypatch, tmp_path, capsys):
 
 
 def test_start_process_exits_immediately(monkeypatch, tmp_path):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
     import pytest
 
     class FakeProcess:
@@ -111,7 +111,7 @@ def test_start_process_exits_immediately(monkeypatch, tmp_path):
 
 
 def test_status_paths(monkeypatch, tmp_path, capsys):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     monkeypatch.setattr(web_cmd, "WEB_PID_PATH", str(tmp_path / "webui.pid"))
 
@@ -131,7 +131,7 @@ def test_status_paths(monkeypatch, tmp_path, capsys):
 
 
 def test_stop_rejects_non_owned_process(monkeypatch, tmp_path, capsys):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     pid_file = tmp_path / "webui.pid"
     pid_file.write_text("123", encoding="utf-8")
@@ -146,7 +146,7 @@ def test_stop_rejects_non_owned_process(monkeypatch, tmp_path, capsys):
 
 
 def test_run_server_no_browser(monkeypatch, capsys):
-    from pacli.commands import web as web_cmd
+    from sinduk.commands import web as web_cmd
 
     class FakeSocket:
         def run(self, app, host, port, debug, allow_unsafe_werkzeug):

@@ -7,25 +7,25 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from pacli.cli import cli
+from sinduk.cli import cli
 
 
 @pytest.fixture(autouse=True)
 def isolated_pacli_dir(tmp_path, monkeypatch):
     """Redirect all pacli config to a temp directory for test isolation."""
-    test_config = str(tmp_path / "pacli_config")
+    test_config = str(tmp_path / "sinduk_config")
     os.makedirs(test_config, exist_ok=True)
 
-    monkeypatch.setattr("pacli.vault.PACLI_DIR", test_config)
-    monkeypatch.setattr("pacli.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
-    monkeypatch.setattr("pacli.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
-    monkeypatch.setattr("pacli.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
+    monkeypatch.setattr("sinduk.vault.PACLI_DIR", test_config)
+    monkeypatch.setattr("sinduk.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
+    monkeypatch.setattr("sinduk.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
+    monkeypatch.setattr("sinduk.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
 
     # Also patch the store paths so they don't conflict with real data
     store_salt_path = os.path.join(test_config, "salt.bin")
     store_hash_path = os.path.join(test_config, "password_hash.bin")
-    monkeypatch.setattr("pacli.store.SALT_PATH", store_salt_path)
-    monkeypatch.setattr("pacli.store.PASSWORD_HASH_PATH", store_hash_path)
+    monkeypatch.setattr("sinduk.store.SALT_PATH", store_salt_path)
+    monkeypatch.setattr("sinduk.store.PASSWORD_HASH_PATH", store_hash_path)
 
     yield test_config
 

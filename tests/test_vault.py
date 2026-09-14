@@ -7,7 +7,7 @@ import json
 import pytest
 from cryptography.fernet import Fernet
 
-from pacli.vault import (
+from sinduk.vault import (
     VaultManager,
     VaultRole,
     ROLE_PERMISSIONS,
@@ -19,13 +19,13 @@ from pacli.vault import (
 @pytest.fixture(autouse=True)
 def isolated_pacli_dir(tmp_path, monkeypatch):
     """Redirect all pacli config to a temp directory for test isolation."""
-    test_config = str(tmp_path / "pacli_config")
+    test_config = str(tmp_path / "sinduk_config")
     os.makedirs(test_config, exist_ok=True)
 
-    monkeypatch.setattr("pacli.vault.PACLI_DIR", test_config)
-    monkeypatch.setattr("pacli.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
-    monkeypatch.setattr("pacli.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
-    monkeypatch.setattr("pacli.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
+    monkeypatch.setattr("sinduk.vault.PACLI_DIR", test_config)
+    monkeypatch.setattr("sinduk.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
+    monkeypatch.setattr("sinduk.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
+    monkeypatch.setattr("sinduk.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
 
     yield test_config
 

@@ -7,36 +7,36 @@ import pytest
 from click.testing import CliRunner
 from cryptography.fernet import Fernet
 
-from pacli.cli import cli
-from pacli.server import SyncServerDB, create_sync_server_app
-from pacli.vault import set_user_identity
+from sinduk.cli import cli
+from sinduk.server import SyncServerDB, create_sync_server_app
+from sinduk.vault import set_user_identity
 
 
 @pytest.fixture(autouse=True)
 def isolated_pacli_dir(tmp_path, monkeypatch):
-    test_config = str(tmp_path / "pacli_config")
+    test_config = str(tmp_path / "sinduk_config")
     os.makedirs(test_config, exist_ok=True)
 
-    monkeypatch.setattr("pacli.vault.PACLI_DIR", test_config)
-    monkeypatch.setattr("pacli.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
-    monkeypatch.setattr("pacli.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
-    monkeypatch.setattr("pacli.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
+    monkeypatch.setattr("sinduk.vault.PACLI_DIR", test_config)
+    monkeypatch.setattr("sinduk.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
+    monkeypatch.setattr("sinduk.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
+    monkeypatch.setattr("sinduk.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
 
     store_salt_path = os.path.join(test_config, "salt.bin")
     store_hash_path = os.path.join(test_config, "password_hash.bin")
-    monkeypatch.setattr("pacli.store.SALT_PATH", store_salt_path)
-    monkeypatch.setattr("pacli.store.PASSWORD_HASH_PATH", store_hash_path)
+    monkeypatch.setattr("sinduk.store.SALT_PATH", store_salt_path)
+    monkeypatch.setattr("sinduk.store.PASSWORD_HASH_PATH", store_hash_path)
 
     server_dir = os.path.join(test_config, "server")
-    monkeypatch.setattr("pacli.server.SERVER_DIR", server_dir)
-    monkeypatch.setattr("pacli.server.SERVER_DB_PATH", os.path.join(server_dir, "server.db"))
-    monkeypatch.setattr("pacli.commands.server.SERVER_DIR", server_dir)
-    monkeypatch.setattr("pacli.commands.server.SERVER_PID_PATH", os.path.join(server_dir, "server.pid"))
-    monkeypatch.setattr("pacli.commands.server.SERVER_STATE_PATH", os.path.join(server_dir, "server_state.json"))
-    monkeypatch.setattr("pacli.commands.server.SERVER_LOG_PATH", os.path.join(server_dir, "server.log"))
+    monkeypatch.setattr("sinduk.server.SERVER_DIR", server_dir)
+    monkeypatch.setattr("sinduk.server.SERVER_DB_PATH", os.path.join(server_dir, "server.db"))
+    monkeypatch.setattr("sinduk.commands.server.SERVER_DIR", server_dir)
+    monkeypatch.setattr("sinduk.commands.server.SERVER_PID_PATH", os.path.join(server_dir, "server.pid"))
+    monkeypatch.setattr("sinduk.commands.server.SERVER_STATE_PATH", os.path.join(server_dir, "server_state.json"))
+    monkeypatch.setattr("sinduk.commands.server.SERVER_LOG_PATH", os.path.join(server_dir, "server.log"))
 
     sync_cfg_path = os.path.join(test_config, "sync_config.json")
-    monkeypatch.setattr("pacli.sync_client.SYNC_CONFIG_PATH", sync_cfg_path)
+    monkeypatch.setattr("sinduk.sync_client.SYNC_CONFIG_PATH", sync_cfg_path)
 
     yield test_config
 
@@ -61,7 +61,7 @@ class TestSyncServerDB:
         db = SyncServerDB(os.path.join(isolated_pacli_dir, "server", "server.db"))
 
         token_id, raw_token = db.create_token("Alice", role="admin")
-        assert raw_token.startswith("pacli_tok_")
+        assert raw_token.startswith("sinduk_tok_")
         assert len(token_id) == 8
 
         # Verify token

@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/pacli-tool/
+      url: https://pypi.org/project/sinduk/
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v6.0.2

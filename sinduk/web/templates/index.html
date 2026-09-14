@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sinduk — Secrets Manager</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+  </style>
+</head>
+
+<body>
+
+  <!-- Setup overlay -->
+  <div id="setup-overlay" class="overlay hidden">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="icon">🔐</div>
+        <h1>Welcome to Sinduk</h1>
+        <p>Create a master password to encrypt your secrets.</p>
+      </div>
+      <div class="field"><label for="setup-pw">Master password</label>
+        <input type="password" id="setup-pw" placeholder="Choose a strong password" />
+      </div>
+      <div class="field"><label for="setup-pw2">Confirm password</label>
+        <input type="password" id="setup-pw2" placeholder="Repeat your password"
+          onkeydown="if(event.key==='Enter')doSetup()" />
+      </div>
+      <div class="auth-actions">
+        <button class="btn btn-primary btn-block" onclick="doSetup()">Get Started →</button>
+      </div>
+      <div id="setup-error" class="alert alert-error hidden"></div>
+    </div>
+  </div>
+
+  <!-- Login overlay -->
+  <div id="login-overlay" class="overlay hidden">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="icon">🔐</div>
+        <h1>Sinduk</h1>
+        <p>Enter your master password to continue.</p>
+      </div>
+      <div class="field"><label for="login-pw">Master password</label>
+        <input type="password" id="login-pw" placeholder="Master password"
+          onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <div class="auth-actions">
+        <button class="btn btn-primary btn-block" onclick="doLogin()">Unlock →</button>
+      </div>
+      <div id="login-error" class="alert alert-error hidden"></div>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="topbar-brand"><span>🔐</span> Sinduk</div>
+      <div class="topbar-actions">
+        <span class="topbar-count" id="total-count"></span>
+        <!-- Theme pill toggle -->
+        <button id="theme-toggle-btn" class="theme-toggle-pill" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
+          <span class="theme-pill-track">
+            <span class="theme-pill-thumb">
+              <!-- Sun icon -->
+              <svg class="pill-icon pill-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              <!-- Moon icon -->
+              <svg class="pill-icon pill-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </span>
+            <!-- Track background icons -->
+            <svg class="pill-track-icon pill-track-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg class="pill-track-icon pill-track-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </span>
+        </button>
+
+        <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="openEnvModal()" title="Import .env file">📥 .env</button>
+        <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="openBackupModal()">☁️ Backup</button>
+        <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="openSSHModal()">⌨️ SSH</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Add</button>
+        <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="doLogout()">Sign out</button>
+
+        <!-- Mobile hamburger -->
+        <button class="btn btn-ghost btn-sm mobile-menu-btn" id="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="body">
+      <aside class="sidebar">
+        <!-- Vault switcher -->
+        <div class="sidebar-vault-box">
+          <label for="vault-select" class="sidebar-section-title">Vault</label>
+          <div class="vault-select-row">
+            <select id="vault-select" class="vault-select" aria-label="Select Vault" onchange="onVaultChange(this.value)">
+              <option value="">🔒 Personal Store</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="openNewVaultModal()" title="Create new team vault">+</button>
+          </div>
+          <div id="vault-badge-row" class="vault-badge-row hidden">
+            <span id="vault-role-badge" class="badge badge-vault">Admin</span>
+            <button class="btn btn-ghost btn-xs" onclick="openTeamModal()" title="Manage Team Members">👥 Team</button>
+            <button class="btn btn-ghost btn-xs" onclick="openAuditModal()" title="View Audit Log">📋 Log</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="sidebar-section-title">Filter</div>
+          <div class="filter-list">
+            <button class="filter-item active" onclick="setFilter('all',this)">All <span class="filter-count"
+                id="cnt-all">0</span></button>
+            <button class="filter-item" onclick="setFilter('password',this)">🔑 Password <span class="filter-count"
+                id="cnt-password">0</span></button>
+            <button class="filter-item" onclick="setFilter('token',this)">🪙 Token <span class="filter-count"
+                id="cnt-token">0</span></button>
+            <button class="filter-item" onclick="setFilter('ssh',this)">🖥️ SSH <span class="filter-count"
+                id="cnt-ssh">0</span></button>
+          </div>
+        </div>
+        <div>
+          <label for="search-input" class="sidebar-section-title">Search <kbd class="kbd">⌘K</kbd></label>
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" aria-label="Search secrets by label" placeholder="Search labels…" oninput="doSearch(this.value)" />
+          </div>
+        </div>
+        <div class="sidebar-shortcuts">
+          <div class="sidebar-section-title">Shortcuts</div>
+          <div class="shortcut-list">
+            <span class="shortcut-item"><kbd class="kbd">Esc</kbd> Close modal</span>
+          </div>
+        </div>
+      </aside>
+      <main class="main">
+        <div id="secrets-grid" class="secrets-grid"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Add/Edit modal — TYPE-AWARE -->
+  <div id="edit-backdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="edit-title">Add Secret</h3>
+        <button class="modal-close" onclick="closeEditModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label for="edit-label">Label <span class="required-tag">*</span></label>
+          <input type="text" id="edit-label" placeholder="e.g. github, stripe-key, prod-server" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="edit-type">Type</label>
+          <div class="type-selector" id="type-selector">
+            <button type="button" class="type-btn active" data-type="password" onclick="selectType('password', this)">
+              <span class="type-icon">🔑</span>
+              <span class="type-name">Password</span>
+              <span class="type-desc">username + password</span>
+            </button>
+            <button type="button" class="type-btn" data-type="token" onclick="selectType('token', this)">
+              <span class="type-icon">🪙</span>
+              <span class="type-name">Token</span>
+              <span class="type-desc">API key / token</span>
+            </button>
+            <button type="button" class="type-btn" data-type="ssh" onclick="selectType('ssh', this)">
+              <span class="type-icon">🖥️</span>
+              <span class="type-name">SSH</span>
+              <span class="type-desc">server connection</span>
+            </button>
+          </div>
+          <!-- Hidden select kept for backward compat with saveSecret() -->
+          <select id="edit-type" class="hidden" onchange="onEditTypeChange()">
+            <option value="password">Password</option>
+            <option value="token">Token</option>
+            <option value="ssh">SSH</option>
+          </select>
+        </div>
+
+        <!-- Dynamic fields rendered by JS -->
+        <div id="edit-fields-container"></div>
+
+        <div id="edit-error" class="alert alert-error hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSecret()">Save Secret</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View modal -->
+  <div id="view-backdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="view-title-text">Secret details</h3>
+        <button class="modal-close" onclick="closeViewModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="view-row">
+          <div class="view-row-label">Label</div>
+          <div class="view-row-value" id="view-label-val"></div>
+        </div>
+        <div class="view-row">
+          <div class="view-row-label">Type</div>
+          <div class="view-row-value" id="view-type-val"></div>
+        </div>
+
+        <div class="view-row-label">Secret</div>
+        <div class="reveal-area">
+          <div class="reveal-text masked" id="reveal-text">••••••••••••••••</div>
+        </div>
+        <div class="reveal-btns-row">
+          <button class="btn btn-ghost btn-sm" id="reveal-toggle-btn" onclick="toggleReveal()">👁 Show</button>
+          <button class="btn btn-ghost btn-sm" onclick="copySecret()" title="Copy password / token">📋 Copy</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyUsername()" id="copy-username-btn" title="Copy username">👤
+            Username</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyFullSecret()" title="Copy full value">📄 Full</button>
+        </div>
+
+        <div class="view-row" id="view-created-by-row" style="margin-top:.75rem">
+          <div class="view-row-label">Created by</div>
+          <div class="view-row-value" id="view-created-by-val">—</div>
+        </div>
+        <div class="view-row">
+          <div class="view-row-label">Created</div>
+          <div class="view-row-value" id="view-created-val"></div>
+        </div>
+        <div class="view-row">
+          <div class="view-row-label">Updated</div>
+          <div class="view-row-value" id="view-updated-val"></div>
+        </div>
+        <div id="view-msg" class="alert hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger btn-sm" onclick="deleteSecret()">🗑 Delete</button>
+        <button id="view-ssh-btn" class="btn btn-ghost btn-sm" onclick="openSSHFromView()" style="display:none">⌨️
+          Connect</button>
+        <button class="btn btn-ghost" onclick="closeViewModal()">Close</button>
+        <button class="btn btn-primary" onclick="openEditFromView()">✏️ Edit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SSH Terminal modal — with fullscreen toggle + font controls -->
+  <div id="ssh-backdrop" class="modal-backdrop hidden">
+    <div class="modal modal-lg" id="ssh-modal">
+      <div class="modal-header">
+        <h3>⌨️ SSH Terminal</h3>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span id="ssh-status" class="ssh-status" style="display:none"></span>
+
+          <!-- Font size + copy controls (shown once connected) -->
+          <div id="ssh-font-controls" class="ssh-font-controls hidden">
+            <button class="ssh-ctrl-btn" onclick="adjustTerminalFont(-1)" title="Decrease font size" aria-label="Decrease font size">A−</button>
+            <button class="ssh-ctrl-btn" onclick="adjustTerminalFont(1)" title="Increase font size" aria-label="Increase font size">A+</button>
+            <button class="ssh-ctrl-btn" onclick="copySSHOutput()" title="Copy terminal output" aria-label="Copy terminal output">⎘</button>
+          </div>
+
+          <!-- Fullscreen toggle -->
+          <button id="ssh-fullscreen-btn" class="ssh-ctrl-btn ssh-fullscreen-btn" onclick="toggleSSHFullscreen()" title="Fullscreen (F11)" aria-label="Toggle fullscreen">
+            <svg id="ssh-fs-icon-expand" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+              <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+            </svg>
+            <svg id="ssh-fs-icon-compress" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/>
+              <line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/>
+            </svg>
+          </button>
+
+          <button class="modal-close" onclick="closeSSHModal()">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div id="ssh-connect-area">
+          <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('ssh','manual',this)">Manual</button>
+            <button class="tab-btn" onclick="switchTab('ssh','stored',this)">Stored Servers</button>
+          </div>
+
+          <div id="ssh-panel-manual" class="tab-panel active">
+            <div class="ssh-grid">
+              <div class="field"><label for="ssh-host">Hostname / IP</label><input type="text" id="ssh-host"
+                  placeholder="192.168.1.1" /></div>
+              <div class="field"><label for="ssh-port">Port</label><input type="number" id="ssh-port" value="22" min="1"
+                  max="65535" /></div>
+              <div class="field"><label for="ssh-user">Username</label><input type="text" id="ssh-user"
+                  placeholder="root" /></div>
+              <div class="field"><label for="ssh-auth">Auth type</label>
+                <select id="ssh-auth" onchange="toggleSSHAuth()">
+                  <option value="password">Password</option>
+                  <option value="key">SSH Key</option>
+                </select>
+              </div>
+            </div>
+            <div id="ssh-pw-field" class="field">
+              <label for="ssh-password">Password</label>
+              <div class="pw-input-wrap">
+                <input type="password" id="ssh-password" />
+                <button type="button" class="pw-toggle" onclick="togglePwVisibility('ssh-password', this)">👁</button>
+              </div>
+            </div>
+            <div id="ssh-key-fields" class="hidden">
+              <div class="field"><label for="ssh-key-select">Select key from secrets</label>
+                <select id="ssh-key-select">
+                  <option value="">— Choose stored key —</option>
+                </select>
+              </div>
+              <div class="field"><label for="ssh-key-paste">Or paste private key</label>
+                <textarea id="ssh-key-paste" rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="sshConnect('manual')">Connect →</button>
+            <div id="ssh-manual-error" class="alert alert-error hidden"></div>
+          </div>
+
+          <div id="ssh-panel-stored" class="tab-panel">
+            <p class="help-text">
+              SSH secrets stored as <code class="inline-code">user:host|port:22|key:/path</code>
+            </p>
+            <div class="field"><label for="ssh-stored-select">Select SSH server</label>
+              <select id="ssh-stored-select">
+                <option value="">— Choose —</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="sshConnect('stored')">Connect →</button>
+            <div id="ssh-stored-error" class="alert alert-error hidden"></div>
+          </div>
+        </div>
+
+        <!-- Terminal -->
+        <div id="ssh-terminal-wrap" class="hidden">
+          <div class="ssh-terminal" id="ssh-terminal">
+            <div class="ssh-terminal-toolbar">
+              <span class="terminal-dot red"></span>
+              <span class="terminal-dot yellow"></span>
+              <span class="terminal-dot green"></span>
+              <span class="terminal-title" id="ssh-terminal-title">SSH Session</span>
+              <button class="terminal-clear-btn" onclick="clearSSHOutput()" title="Clear output">⌫ Clear</button>
+            </div>
+            <div id="ssh-output" class="ssh-output"></div>
+            <div class="ssh-input-row">
+              <span class="ssh-prompt">$&nbsp;</span>
+              <input type="text" class="ssh-cmd" id="ssh-cmd" aria-label="SSH Command Input" placeholder="type command and press Enter…" disabled
+                onkeydown="sshKey(event)" autocomplete="off" spellcheck="false" />
+              <button class="btn btn-danger btn-sm ssh-disconnect-btn" onclick="sshDisconnect()">Disconnect</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- .env Import modal -->
+  <div id="env-backdrop" class="modal-backdrop hidden">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3>📥 Import from .env File</h3>
+        <button class="modal-close" onclick="closeEnvModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="help-text" style="margin-bottom:1rem">
+          Each <code class="inline-code">KEY=VALUE</code> line will be imported as a <strong>token</strong> secret.
+          Comments (<code class="inline-code">#</code>) are ignored.
+        </p>
+        <button type="button" class="upload-zone" id="env-upload-zone"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="event.preventDefault();this.classList.remove('drag-over');S.envFile=event.dataTransfer.files[0];const r=new FileReader();r.onload=e=>previewEnvFile(e.target.result);r.readAsText(S.envFile)">
+          <p>📂 Click or drag &amp; drop a <code class="inline-code">.env</code> file</p>
+        </button>
+        <label for="env-file-input" class="hidden">Choose .env File</label>
+        <input type="file" id="env-file-input" aria-label="Choose .env file" accept=".env,text/plain" class="hidden"
+          onchange="onEnvFileSelected(this)" />
+
+        <div id="env-preview" class="env-preview"></div>
+        <div id="env-msg" class="alert hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeEnvModal()">Cancel</button>
+        <button id="env-import-btn" class="btn btn-primary hidden" onclick="doEnvImport()">Import Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup modal -->
+  <div id="backup-backdrop" class="modal-backdrop hidden">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3>☁️ Encrypted Backup</h3>
+        <button class="modal-close" onclick="closeBackupModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('backup','export',this)">Export</button>
+          <button class="tab-btn" onclick="switchTab('backup','import',this)">Import</button>
+        </div>
+        <div id="backup-panel-export" class="tab-panel active">
+          <div class="backup-box">
+            <h4>Export encrypted backup</h4>
+            <p>Your secrets are encrypted with the backup password before download. Safe to store on Dropbox, Google
+              Drive, iCloud, etc.</p>
+            <div class="field"><label for="backup-export-pw">Backup password</label>
+              <input type="password" id="backup-export-pw" placeholder="Choose a backup password" />
+            </div>
+            <div class="field"><label for="backup-export-pw2">Confirm backup password</label>
+              <input type="password" id="backup-export-pw2" placeholder="Repeat backup password" />
+            </div>
+            <button class="btn btn-primary" onclick="doBackupExport()">⬇️ Download Backup</button>
+          </div>
+          <div id="backup-export-msg" class="alert hidden"></div>
+        </div>
+        <div id="backup-panel-import" class="tab-panel">
+          <div class="backup-box">
+            <h4>Import from backup file</h4>
+            <p>Restore secrets from a <code class="inline-code">.sinduk</code> or <code class="inline-code">.pacli</code> backup. Existing secrets are skipped by
+              default.</p>
+            <button type="button" class="upload-zone" id="upload-zone"
+              ondragover="event.preventDefault();this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')" ondrop="handleFileDrop(event)">
+              <p id="upload-zone-label">📂 Click to choose a .sinduk / .pacli file, or drag & drop</p>
+            </button>
+            <label for="backup-file-input" class="hidden">Choose Backup File</label>
+            <input type="file" id="backup-file-input" aria-label="Choose backup file" accept=".sinduk,.pacli" class="hidden" onchange="onFileSelected(this)" />
+            <div class="field"><label for="backup-import-pw">Backup password</label>
+              <input type="password" id="backup-import-pw" placeholder="Password used when backup was created" />
+            </div>
+            <label for="import-overwrite" style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;cursor:pointer">
+              <input type="checkbox" id="import-overwrite" style="width:auto;margin:0" />
+              <span style="font-size:.875rem">Overwrite existing secrets</span>
+            </label>
+            <button class="btn btn-primary" onclick="doBackupImport()">⬆️ Import Secrets</button>
+          </div>
+          <div id="backup-import-msg" class="alert hidden"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Vault modal -->
+  <div id="new-vault-backdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Create Team Vault</h3>
+        <button class="modal-close" onclick="closeNewVaultModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label for="new-vault-name">Vault Name <span class="required-tag">*</span></label>
+          <input type="text" id="new-vault-name" placeholder="e.g. team-infra, prod-keys" autocomplete="off" />
+          <span class="help-text">Alphanumeric with hyphens/underscores only.</span>
+        </div>
+        <div class="field">
+          <label for="new-vault-desc">Description <span class="optional-tag">optional</span></label>
+          <input type="text" id="new-vault-desc" placeholder="e.g. Shared keys for DevOps team" autocomplete="off" />
+        </div>
+        <div id="new-vault-error" class="alert alert-error hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeNewVaultModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="doCreateVault()">Create Vault</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team Management modal -->
+  <div id="team-backdrop" class="modal-backdrop hidden">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3 id="team-modal-title">👥 Team Members</h3>
+        <button class="modal-close" onclick="closeTeamModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="team-identity-banner" id="team-identity-banner">
+          <div>Your Identity: <strong id="my-identity-name">—</strong> (<code id="my-identity-id" class="inline-code">—</code>)</div>
+          <div>Role in this vault: <span id="my-vault-role" class="badge badge-vault">Admin</span></div>
+        </div>
+
+        <div class="team-members-header">
+          <h4>Members</h4>
+          <button id="add-member-toggle-btn" class="btn btn-primary btn-sm" onclick="toggleAddMemberForm()">+ Add Member</button>
+        </div>
+
+        <!-- Add member form -->
+        <div id="add-member-form" class="add-member-box hidden">
+          <h5>Add Member to Vault</h5>
+          <div class="grid-2col">
+            <div class="field">
+              <label for="new-member-id">User ID <span class="required-tag">*</span></label>
+              <input type="text" id="new-member-id" placeholder="12-char user ID (ask member)" />
+            </div>
+            <div class="field">
+              <label for="new-member-name">Display Name <span class="required-tag">*</span></label>
+              <input type="text" id="new-member-name" placeholder="e.g. Alice" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="new-member-role">Role</label>
+            <select id="new-member-role">
+              <option value="viewer">Viewer (Read-only)</option>
+              <option value="editor">Editor (Can create/edit/delete secrets)</option>
+              <option value="admin">Admin (Can manage members & vault)</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:.5rem;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="toggleAddMemberForm()">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="doAddMember()">Add Member</button>
+          </div>
+          <div id="add-member-error" class="alert alert-error hidden" style="margin-top:.5rem"></div>
+        </div>
+
+        <!-- Members list -->
+        <div id="team-members-list" class="team-members-list"></div>
+        <div id="team-msg" class="alert hidden" style="margin-top:.75rem"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger btn-sm" id="delete-vault-btn" onclick="doDeleteCurrentVault()">🗑 Delete Vault</button>
+        <button class="btn btn-ghost" onclick="closeTeamModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audit Log modal -->
+  <div id="audit-backdrop" class="modal-backdrop hidden">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3 id="audit-modal-title">📋 Vault Audit Log</h3>
+        <button class="modal-close" onclick="closeAuditModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="audit-log-container" class="audit-log-container">
+          <div class="empty-state"><p>Loading audit log…</p></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeAuditModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile menu drawer -->
+  <button id="mobile-drawer-overlay" class="mobile-drawer-overlay hidden" onclick="closeMobileMenu()" aria-label="Close menu" tabindex="0"></button>
+  <div id="mobile-drawer" class="mobile-drawer hidden">
+    <div class="mobile-drawer-header">
+      <span class="topbar-brand"><span>🔐</span> Sinduk</span>
+      <button class="modal-close" onclick="closeMobileMenu()">✕</button>
+    </div>
+    <div class="mobile-drawer-body">
+      <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();openEnvModal()">📥 Import .env</button>
+      <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();openBackupModal()">☁️ Backup</button>
+      <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();openSSHModal()">⌨️ SSH</button>
+      <hr class="mobile-drawer-divider"/>
+      <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();doLogout()">Sign out</button>
+    </div>
+  </div>
+
+  <!-- Mobile sidebar/filter FAB -->
+  <button id="mobile-sidebar-btn" class="mobile-sidebar-fab hidden" onclick="toggleMobileSidebar()" aria-label="Filter and Search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+  </button>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script src="{{ url_for('static', filename='ssh_terminal.js') }}"></script>
+
+  <script>
+    // Type selector UI helper (bridges visual buttons to hidden select)
+    function selectType(type, btn) {
+      document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const select = document.getElementById('edit-type');
+      select.value = type;
+      renderSecretTypeForm(type);
+    }
+
+    function bindBackdropClose(backdropId, closeFn) {
+      const backdrop = document.getElementById(backdropId);
+      if (!backdrop || typeof closeFn !== 'function') return;
+      backdrop.addEventListener('click', (event) => {
+        if (event.target === backdrop) closeFn();
+      });
+    }
+
+    function bindFilePicker(zoneId, inputId) {
+      const zone = document.getElementById(zoneId);
+      const fileInput = document.getElementById(inputId);
+      if (!zone || !fileInput) return;
+      zone.addEventListener('click', () => fileInput.click());
+    }
+
+    bindBackdropClose('edit-backdrop',      closeEditModal);
+    bindBackdropClose('view-backdrop',      closeViewModal);
+    bindBackdropClose('new-vault-backdrop', closeNewVaultModal);
+    bindBackdropClose('team-backdrop',      closeTeamModal);
+    bindBackdropClose('audit-backdrop',     closeAuditModal);
+    // NOTE: ssh-backdrop intentionally NOT closed on outside click when connected
+    bindBackdropClose('env-backdrop',       closeEnvModal);
+    bindBackdropClose('backup-backdrop',    closeBackupModal);
+    bindFilePicker('env-upload-zone', 'env-file-input');
+    bindFilePicker('upload-zone', 'backup-file-input');
+  </script>
+</body>
+
+</html>

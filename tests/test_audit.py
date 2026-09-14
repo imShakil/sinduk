@@ -5,7 +5,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from pacli.audit import AuditEvent, AuditLog, AuditRecord
+from sinduk.audit import AuditEvent, AuditLog, AuditRecord
 
 
 class TestAuditEvent:
@@ -311,7 +311,7 @@ class TestAuditLog:
 
     def test_audit_log_singleton(self):
         """Module-level audit_log should be available."""
-        from pacli.audit import audit_log as global_log
+        from sinduk.audit import audit_log as global_log
 
         assert global_log is not None
         assert isinstance(global_log, AuditLog)

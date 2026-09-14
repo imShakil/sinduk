@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>pacli — Secrets Management CLI</title>
+<title>sinduk — Secrets Management CLI & Team Vaults</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -784,33 +784,33 @@
 
 <!-- NAV -->
 <nav id="nav">
-  <div class="nav-logo">🔐 <span>~/</span>pacli</div>
+  <div class="nav-logo">🔐 <span>~/</span>sinduk</div>
   <ul class="nav-links">
     <li><a href="#features">Features</a></li>
     <li><a href="#commands">Commands</a></li>
     <li><a href="#webui">Web UI</a></li>
     <li><a href="#install">Install</a></li>
-    <li><img alt="hits" src="https://hitscounter.dev/api/hit?url=https%3A%2F%2Fmhosen.com%2Fpacli&label=&icon=cloud-check-fill&color=%23000&message=&style=social&tz=UTC"></li>
+    <li><img alt="hits" src="https://hitscounter.dev/api/hit?url=https%3A%2F%2Fmhosen.com%2Fsinduk&label=&icon=cloud-check-fill&color=%23000&message=&style=social&tz=UTC"></li>
   </ul>
   <a href="https://github.com/imShakil/pacli" target="_blank" class="nav-cta">GitHub ↗</a>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-badge">v1.4.2 — Now Available on PyPI</div>
+  <div class="hero-badge">v1.4.2 — Formerly pacli · Now sinduk on PyPI</div>
   <h1 class="hero-title">
     <span class="line1">Secrets. Local.</span>
     <span class="line2">Encrypted.</span>
   </h1>
   <p class="hero-sub">
-    pacli is a secure, local-first CLI secrets manager.
+    sinduk (formerly pacli) is a secure, local-first CLI secrets manager.
     Store passwords, API keys &amp; SSH credentials with
     AES encryption — zero cloud, zero trust required.
   </p>
   <div class="hero-actions">
     <a href="#install" class="btn-primary">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/><path d="M9 18H5a2 2 0 01-2-2V8a2 2 0 012-2h4"/></svg>
-      pip install pacli-tool
+      pip install sinduk
     </a>
     <a href="https://github.com/imShakil/pacli" target="_blank" class="btn-ghost">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0112 6.8c.85.004 1.7.115 2.5.337 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10.01 10.01 0 0022 12c0-5.52-4.48-10-10-10z"/></svg>
@@ -829,14 +829,14 @@
         <span class="terminal-title">zsh — 80×24</span>
       </div>
       <div class="terminal-body">
-        <div class="line-prompt"><span class="dollar">$</span><span class="cmd">pacli <span class="flag">init</span></span></div>
-        <div class="line-out success">✓ pacli initialized. Master password set.</div>
+        <div class="line-prompt"><span class="dollar">$</span><span class="cmd">sinduk <span class="flag">init</span></span></div>
+        <div class="line-out success">✓ sinduk initialized. Master password set.</div>
         <div class="line-blank"></div>
-        <div class="line-prompt"><span class="dollar">$</span><span class="cmd">pacli <span class="flag">add</span> <span class="flag">--token</span> <span class="arg">openai-key</span></span></div>
+        <div class="line-prompt"><span class="dollar">$</span><span class="cmd">sinduk <span class="flag">add</span> <span class="flag">--token</span> <span class="arg">openai-key</span></span></div>
         <div class="line-out info">🔑 Enter value: ••••••••••••••••••••</div>
         <div class="line-out success">✓ Secret "openai-key" saved securely.</div>
         <div class="line-blank"></div>
-        <div class="line-prompt"><span class="dollar">$</span><span class="cmd">pacli <span class="flag">get</span> <span class="arg">openai-key</span> <span class="flag">--clip</span></span></div>
+        <div class="line-prompt"><span class="dollar">$</span><span class="cmd">sinduk <span class="flag">get</span> <span class="arg">openai-key</span> <span class="flag">--clip</span></span></div>
         <div class="line-out success">✓ Copied to clipboard.</div>
         <div class="line-blank"></div>
         <div class="line-prompt"><span class="dollar">$</span><span class="cursor"></span></div>
@@ -872,7 +872,7 @@
 <!-- FEATURES -->
 <section id="features">
   <div class="container">
-    <div class="section-label">Why pacli</div>
+    <div class="section-label">Why sinduk</div>
     <h2 class="section-title">Everything lives<br>on your machine.</h2>
 
     <div class="features-grid">
@@ -894,17 +894,17 @@
       <div class="feature-card">
         <span class="feature-icon">🖥️</span>
         <div class="feature-name">Web UI Included</div>
-        <p class="feature-desc">Launch a local web interface with <code>pacli web</code> featuring vault switcher, member management, and audit log inspection.</p>
+        <p class="feature-desc">Launch a local web interface with <code>sinduk web</code> featuring vault switcher, member management, and audit log inspection.</p>
       </div>
       <div class="feature-card">
         <span class="feature-icon">📋</span>
         <div class="feature-name">Clipboard &amp; Pipelines</div>
-        <p class="feature-desc">Retrieve any secret directly to your clipboard with <code>--clip</code>. Pipe any command output with <code>pacli cc</code>.</p>
+        <p class="feature-desc">Retrieve any secret directly to your clipboard with <code>--clip</code>. Pipe any command output with <code>sinduk cc</code>.</p>
       </div>
       <div class="feature-card">
         <span class="feature-icon">🔑</span>
         <div class="feature-name">SSH Management</div>
-        <p class="feature-desc">Store SSH connections with host, user, and key file. Connect instantly with <code>pacli ssh &lt;label&gt;</code> or in-browser terminal.</p>
+        <p class="feature-desc">Store SSH connections with host, user, and key file. Connect instantly with <code>sinduk ssh &lt;label&gt;</code> or in-browser terminal.</p>
       </div>
       <div class="feature-card">
         <span class="feature-icon">📦</span>
@@ -976,12 +976,12 @@
       </div>
       <div class="cmd-demo">
         <div class="code-block" id="codeDemo">
-          <span class="p">$</span> pacli <span class="f">init</span><br><br>
+          <span class="p">$</span> sinduk <span class="f">init</span><br><br>
           <span class="c"># First-time setup</span><br>
           <span class="o">Enter master password: </span><span class="v">••••••••</span><br>
           <span class="o">Confirm master password: </span><span class="v">••••••••</span><br><br>
-          <span class="s">✓ pacli initialized successfully.</span><br>
-          <span class="s">✓ Master password set. Run `pacli add` to get started.</span>
+          <span class="s">✓ sinduk initialized successfully.</span><br>
+          <span class="s">✓ Master password set. Run `sinduk add` to get started.</span>
         </div>
       </div>
     </div>
@@ -996,7 +996,7 @@
         <div class="section-label">Web UI</div>
         <h2 class="section-title">A visual interface.<br>Still local.</h2>
         <p style="font-family: var(--mono); font-size: 0.82rem; color: var(--muted); line-height: 1.9; margin-top: 1rem;">
-          Run <code style="color: var(--accent2);">pacli web</code> to launch a full-featured web dashboard.
+          Run <code style="color: var(--accent2);">sinduk web</code> to launch a full-featured web dashboard.
           Manage all your secrets visually without giving up local-first security.
         </p>
         <ul class="webui-features">
@@ -1007,7 +1007,7 @@
           <li>In-browser interactive SSH Terminal</li>
           <li>Search and filter by secret type</li>
           <li>Toggle secret visibility &amp; copy to clipboard</li>
-          <li>Run in background with <code style="color:var(--accent2)">pacli web start</code></li>
+          <li>Run in background with <code style="color:var(--accent2)">sinduk web start</code></li>
         </ul>
       </div>
       <div>
@@ -1018,7 +1018,7 @@
               <div class="dot dot-y"></div>
               <div class="dot dot-g"></div>
             </div>
-            <div class="browser-url">localhost:58317 — pacli</div>
+            <div class="browser-url">localhost:58371 — sinduk</div>
           </div>
           <div class="browser-content">
             <div class="mock-header">
@@ -1074,28 +1074,28 @@
       <span class="install-cmd">pip install pipx</span><br>
       <span class="install-cmd">pipx ensurepath</span><br>
       <br>
-      <span class="install-comment"># Install pacli</span><br>
-      <span class="install-cmd">pipx install pacli-tool</span><br>
+      <span class="install-comment"># Install sinduk</span><br>
+      <span class="install-cmd">pipx install sinduk</span><br>
       <br>
       <span class="install-comment"># Verify</span><br>
-      <span class="install-cmd">pacli version</span>
+      <span class="install-cmd">sinduk version</span>
     </div>
 
     <div class="install-block" id="tab-pip">
       <button class="copy-btn" onclick="copyCode('tab-pip')">copy</button>
-      <span class="install-cmd">pip install pacli-tool</span><br>
+      <span class="install-cmd">pip install sinduk</span><br>
       <br>
       <span class="install-comment"># Then initialize</span><br>
-      <span class="install-cmd">pacli init</span>
+      <span class="install-cmd">sinduk init</span>
     </div>
 
     <div class="install-block" id="tab-source">
       <button class="copy-btn" onclick="copyCode('tab-source')">copy</button>
-      <span class="install-cmd">git clone https://github.com/imshakil/pacli.git</span><br>
-      <span class="install-cmd">cd pacli</span><br>
+      <span class="install-cmd">git clone https://github.com/imshakil/pacli.git sinduk</span><br>
+      <span class="install-cmd">cd sinduk</span><br>
       <span class="install-cmd">pip install -e .</span><br>
       <br>
-      <span class="install-cmd">pacli init</span>
+      <span class="install-cmd">sinduk init</span>
     </div>
   </div>
 </section>
@@ -1110,7 +1110,7 @@
       No subscriptions. Zero-knowledge team collaboration. Just encrypted secrets on your local machine.
     </p>
     <div class="hero-actions">
-      <a href="https://pypi.org/project/pacli-tool/" target="_blank" class="btn-primary">
+      <a href="https://pypi.org/project/sinduk/" target="_blank" class="btn-primary">
         Install from PyPI
       </a>
       <a href="https://github.com/imShakil/pacli" target="_blank" class="btn-ghost">
@@ -1122,10 +1122,10 @@
 
 <!-- FOOTER -->
 <footer>
-  <div class="footer-logo">🔐 pacli</div>
+  <div class="footer-logo">🔐 sinduk</div>
   <ul class="footer-links">
     <li><a href="https://github.com/imShakil/pacli" target="_blank">GitHub</a></li>
-    <li><a href="https://pypi.org/project/pacli-tool/" target="_blank">PyPI</a></li>
+    <li><a href="https://pypi.org/project/sinduk/" target="_blank">PyPI</a></li>
     <li><a href="https://github.com/imShakil/pacli/blob/main/LICENSE" target="_blank">MIT License</a></li>
   </ul>
   <span class="footer-copy">Built with ❤️ by imShakil</span>
@@ -1159,30 +1159,30 @@
 
   // Command demos
   const demos = {
-    init: `<span class="p">$</span> pacli <span class="f">init</span><br><br>
+    init: `<span class="p">$</span> sinduk <span class="f">init</span><br><br>
 <span class="c"># First-time setup</span><br>
 <span class="o">Enter master password: </span><span class="v">••••••••</span><br>
 <span class="o">Confirm master password: </span><span class="v">••••••••</span><br><br>
-<span class="s">✓ pacli initialized successfully.</span><br>
-<span class="s">✓ Run \`pacli add\` to get started.</span>`,
+<span class="s">✓ sinduk initialized successfully.</span><br>
+<span class="s">✓ Run \`sinduk add\` to get started.</span>`,
 
-    add: `<span class="p">$</span> pacli <span class="f">add</span> <span class="f">--token</span> <span class="v">stripe-api-key</span><br><br>
+    add: `<span class="p">$</span> sinduk <span class="f">add</span> <span class="f">--token</span> <span class="v">stripe-api-key</span><br><br>
 <span class="o">Master password: </span><span class="v">••••••••</span><br>
 <span class="o">Enter token value: </span><span class="v">••••••••••••••••••••</span><br><br>
 <span class="s">✓ Secret "stripe-api-key" saved.</span><br><br>
 <span class="c"># Add to team vault:</span><br>
-<span class="p">$</span> pacli <span class="f">add</span> <span class="f">--vault</span> <span class="v">dev-infra</span> <span class="f">--pass</span> <span class="v">db-pass</span>`,
+<span class="p">$</span> sinduk <span class="f">add</span> <span class="f">--vault</span> <span class="v">dev-infra</span> <span class="f">--pass</span> <span class="v">db-pass</span>`,
 
-    get: `<span class="p">$</span> pacli <span class="f">get</span> <span class="v">stripe-api-key</span><br><br>
+    get: `<span class="p">$</span> sinduk <span class="f">get</span> <span class="v">stripe-api-key</span><br><br>
 <span class="o">Master password: </span><span class="v">••••••••</span><br><br>
 <span class="o">Label:  </span><span class="s">stripe-api-key</span><br>
 <span class="o">Type:   </span><span class="s">TOKEN</span><br>
 <span class="o">Value:  </span><span class="s">sk_live_••••••••••••</span><br><br>
 <span class="c"># Copy directly to clipboard:</span><br>
-<span class="p">$</span> pacli <span class="f">get</span> <span class="v">stripe-api-key</span> <span class="f">--clip</span><br>
+<span class="p">$</span> sinduk <span class="f">get</span> <span class="v">stripe-api-key</span> <span class="f">--clip</span><br>
 <span class="s">✓ Copied to clipboard.</span>`,
 
-    list: `<span class="p">$</span> pacli <span class="f">list</span> <span class="f">--vault</span> <span class="v">dev-infra</span><br><br>
+    list: `<span class="p">$</span> sinduk <span class="f">list</span> <span class="f">--vault</span> <span class="v">dev-infra</span><br><br>
 <span class="o">Vault: dev-infra (Role: editor)</span><br><br>
 <span class="o"> ID  LABEL              TYPE      </span><br>
 <span class="o"> ──  ─────────────────  ────────  </span><br>
@@ -1190,56 +1190,56 @@
 <span class="s"> 2   stripe-api-key     TOKEN     </span><br>
 <span class="s"> 3   ec2-production     SSH       </span>`,
 
-    team: `<span class="p">$</span> pacli <span class="f">team create-vault</span> <span class="v">dev-infra</span><br>
+    team: `<span class="p">$</span> sinduk <span class="f">team create-vault</span> <span class="v">dev-infra</span><br>
 <span class="s">✓ Vault "dev-infra" created.</span><br><br>
 <span class="c"># Add teammate by User ID:</span><br>
-<span class="p">$</span> pacli <span class="f">team add-member</span> <span class="v">dev-infra a8f910e1234</span> <span class="f">--role</span> <span class="v">editor</span><br>
+<span class="p">$</span> sinduk <span class="f">team add-member</span> <span class="v">dev-infra a8f910e1234</span> <span class="f">--role</span> <span class="v">editor</span><br>
 <span class="s">✓ Added member Bob (editor) to vault "dev-infra".</span><br><br>
 <span class="c"># View audit log:</span><br>
-<span class="p">$</span> pacli <span class="f">team audit-log</span> <span class="v">dev-infra</span>`,
+<span class="p">$</span> sinduk <span class="f">team audit-log</span> <span class="v">dev-infra</span>`,
 
     sync: `<span class="c"># Push local changes to sync server:</span><br>
-<span class="p">$</span> pacli <span class="f">sync push</span> <span class="v">dev-infra</span><br>
+<span class="p">$</span> sinduk <span class="f">sync push</span> <span class="v">dev-infra</span><br>
 <span class="s">✓ Pushed vault "dev-infra" (version 3) to server.</span><br><br>
 <span class="c"># Pull updates on teammate machine:</span><br>
-<span class="p">$</span> pacli <span class="f">sync pull</span> <span class="v">dev-infra</span><br>
+<span class="p">$</span> sinduk <span class="f">sync pull</span> <span class="v">dev-infra</span><br>
 <span class="s">✓ Vault "dev-infra" updated (version 3).</span>`,
 
     server: `<span class="c"># Start zero-knowledge sync server:</span><br>
-<span class="p">$</span> pacli <span class="f">server start</span> <span class="f">--port</span> <span class="v">58380</span> <span class="f">--daemon</span><br>
+<span class="p">$</span> sinduk <span class="f">server start</span> <span class="f">--port</span> <span class="v">58380</span> <span class="f">--daemon</span><br>
 <span class="s">✓ Sync server started on http://0.0.0.0:58380</span><br><br>
 <span class="c"># Create team access token:</span><br>
-<span class="p">$</span> pacli <span class="f">server token create</span> <span class="f">--name</span> <span class="v">"DevTeam"</span><br>
-<span class="s">✓ Token: pacli_tok_84f9a0...</span>`,
+<span class="p">$</span> sinduk <span class="f">server token create</span> <span class="f">--name</span> <span class="v">"DevTeam"</span><br>
+<span class="s">✓ Token: sinduk_tok_84f9a0...</span>`,
 
     backup: `<span class="c"># Export encrypted backup:</span><br>
-<span class="p">$</span> pacli <span class="f">backup export</span> <span class="f">--vault</span> <span class="v">dev-infra</span> <span class="f">-o</span> <span class="v">backup.enc</span><br>
-<span class="s">✓ Exported encrypted backup to backup.enc</span><br><br>
+<span class="p">$</span> sinduk <span class="f">backup export</span> <span class="f">--vault</span> <span class="v">dev-infra</span> <span class="f">-o</span> <span class="v">backup.sinduk</span><br>
+<span class="s">✓ Exported encrypted backup to backup.sinduk</span><br><br>
 <span class="c"># Import on another device:</span><br>
-<span class="p">$</span> pacli <span class="f">backup import</span> <span class="v">backup.enc</span> <span class="f">--vault</span> <span class="v">dev-infra</span><br>
+<span class="p">$</span> sinduk <span class="f">backup import</span> <span class="v">backup.sinduk</span> <span class="f">--vault</span> <span class="v">dev-infra</span><br>
 <span class="s">✓ Backup imported successfully.</span>`,
 
-    ssh: `<span class="p">$</span> pacli <span class="f">add</span> <span class="f">--ssh</span> <span class="v">ec2-vm</span> <span class="v">ubuntu:1.2.3.4</span> <span class="f">--key</span> <span class="v">~/.ssh/id_rsa</span><br>
+    ssh: `<span class="p">$</span> sinduk <span class="f">add</span> <span class="f">--ssh</span> <span class="v">ec2-vm</span> <span class="v">ubuntu:1.2.3.4</span> <span class="f">--key</span> <span class="v">~/.ssh/id_rsa</span><br>
 <span class="s">✓ SSH connection "ec2-vm" saved.</span><br><br>
 <span class="c"># Connect instantly:</span><br>
-<span class="p">$</span> pacli <span class="f">ssh</span> <span class="v">ec2-vm</span><br><br>
+<span class="p">$</span> sinduk <span class="f">ssh</span> <span class="v">ec2-vm</span><br><br>
 <span class="o">Master password: </span><span class="v">••••••••</span><br>
 <span class="s">→ Connecting ubuntu@1.2.3.4...</span><br>
 <span class="s">Welcome to Ubuntu 22.04 LTS</span>`,
 
-    export: `<span class="p">$</span> pacli <span class="f">export</span> <span class="f">--format</span> <span class="v">json</span> <span class="f">--output</span> <span class="v">backup.json</span><br><br>
+    export: `<span class="p">$</span> sinduk <span class="f">export</span> <span class="f">--format</span> <span class="v">json</span> <span class="f">--output</span> <span class="v">backup.json</span><br><br>
 <span class="o">Master password: </span><span class="v">••••••••</span><br><br>
 <span class="s">✓ Exported 4 secrets to backup.json</span><br><br>
 <span class="c"># Also CSV:</span><br>
-<span class="p">$</span> pacli <span class="f">export</span> <span class="f">--format</span> <span class="v">csv</span> <span class="f">--output</span> <span class="v">backup.csv</span>`,
+<span class="p">$</span> sinduk <span class="f">export</span> <span class="f">--format</span> <span class="v">csv</span> <span class="f">--output</span> <span class="v">backup.csv</span>`,
 
-    web: `<span class="p">$</span> pacli <span class="f">web</span><br><br>
-<span class="s">✓ Starting pacli Web UI...</span><br>
-<span class="s">✓ Opening http://localhost:58317</span><br><br>
+    web: `<span class="p">$</span> sinduk <span class="f">web</span><br><br>
+<span class="s">✓ Starting sinduk Web UI...</span><br>
+<span class="s">✓ Opening http://localhost:58371</span><br><br>
 <span class="c"># Background mode:</span><br>
-<span class="p">$</span> pacli <span class="f">web</span> <span class="v">start</span><br>
+<span class="p">$</span> sinduk <span class="f">web</span> <span class="v">start</span><br>
 <span class="s">✓ Running in background.</span><br><br>
-<span class="p">$</span> pacli <span class="f">web</span> <span class="v">stop</span><br>
+<span class="p">$</span> sinduk <span class="f">web</span> <span class="v">stop</span><br>
 <span class="s">✓ Web UI stopped.</span>`
   };
 
