@@ -52,9 +52,9 @@ def migrate_legacy_config(src=LEGACY_CONFIG_DIR, dst=CONFIG_DIR):
         with open(marker, "w") as f:
             f.write("migrated")
         print("📦 Migrated existing data... ")
-    except Exception:
-        logger.warning("Could not migrate existing data.")
-        pass  # B110
+    except Exception as e:
+        print("📦 Could not migrate existing data...")
+        logger.warning(f"Failed to migrate existing data: {e}")
 
 
 migrate_legacy_config()
