@@ -572,7 +572,7 @@ label {
    Sidebar
    ============================================================ */
 .sidebar {
-    width: 210px;
+    width: 240px;
     flex-shrink: 0;
     background: var(--surface);
     background-image: var(--noise);
@@ -1101,6 +1101,119 @@ label {
     text-transform: uppercase;
     letter-spacing: .05em;
     margin-right: .2rem;
+}
+
+.reveal-structured-row {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    padding: .35rem 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: .88rem;
+    width: 100%;
+}
+
+.reveal-structured-row:last-child {
+    border-bottom: none;
+}
+
+.reveal-domain-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    transition: color .15s;
+}
+
+.reveal-domain-link:hover {
+    text-decoration: underline;
+    color: #6ee7b7;
+}
+
+.reveal-pw-val {
+    font-family: var(--font-mono);
+    color: var(--text);
+    font-weight: 600;
+    letter-spacing: .03em;
+    word-break: break-all;
+}
+
+.reveal-cmd-box {
+    margin-top: .6rem;
+    background: var(--terminal-bg);
+    padding: .6rem .85rem;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    overflow-x: auto;
+    color: var(--accent);
+    width: 100%;
+}
+
+.reveal-token-pre {
+    background: var(--surface2);
+    padding: .75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    font-family: var(--font-mono);
+    font-size: .82rem;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text);
+    width: 100%;
+}
+
+.input-with-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.field-leading-icon {
+    position: absolute;
+    left: .75rem;
+    pointer-events: none;
+    font-size: .9rem;
+    color: var(--muted);
+    z-index: 1;
+}
+
+.input-with-icon-wrap input {
+    padding-left: 2.2rem;
+}
+
+.field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .2rem;
+}
+
+.field-label-row label {
+    margin-bottom: 0;
+}
+
+.btn-gen-pw {
+    padding: .2rem .6rem;
+    font-size: .72rem;
+    border-radius: 6px;
+    font-weight: 700;
+    background: var(--accent-subtle);
+    color: var(--accent);
+    border: 1px solid var(--border2);
+    cursor: pointer;
+    transition: all .15s;
+}
+
+.btn-gen-pw:hover {
+    background: rgba(52, 211, 153, .18);
+    border-color: var(--accent);
 }
 
 .reveal-btns-row {
@@ -1951,18 +2064,27 @@ label {
 .vault-badge-row {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
     margin-top: 0.5rem;
+    flex-wrap: nowrap;
 }
 
 .badge-vault {
-    background: rgba(52, 211, 153, 0.15);
+    background: rgba(52, 211, 153, 0.12);
     color: var(--accent);
-    border: 1px solid rgba(52, 211, 153, 0.3);
+    border: 1px solid rgba(52, 211, 153, 0.28);
     text-transform: capitalize;
     font-size: 0.72rem;
-    padding: 0.15rem 0.45rem;
-    border-radius: 4px;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    letter-spacing: 0.03em;
+}
+
+.vault-badge-row .btn-xs {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.72rem;
+    border-radius: 6px;
 }
 
 /* Team Management Modal */

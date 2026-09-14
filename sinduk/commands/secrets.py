@@ -5,7 +5,7 @@ from ..store import SecretStore
 from ..vault import VaultManager
 from ..log import get_logger
 from ..decorators import master_password_required
-from ..helpers import choice_one, copy_to_clipboard
+from ..helpers import choice_one, copy_to_clipboard, parse_secret_payload
 from ..ssh_utils import suggest_ssh_hosts
 
 logger = get_logger("sinduk.commands.secrets")
@@ -101,16 +101,21 @@ def _select_secret(label, matches):
 
 
 def _get_ssh_display(secret, prefix):
-    parts = secret["secret"].split("|")
-    user_ip = parts[0]
+    parsed = parse_secret_payload(secret.get("secret", ""), "ssh")
+    user = parsed.get("user", "")
+    host = parsed.get("host", "")
+    port = parsed.get("port", 22)
+    key_path = parsed.get("key_path", "")
+    opts = parsed.get("opts", "")
+
+    user_ip = f"{user}:{host}" if user and host else host
     extras = []
-    for part in parts[1:]:
-        if part.startswith("key:"):
-            extras.append(f"Key: {part[4:]}")
-        elif part.startswith("port:"):
-            extras.append(f"Port: {part[5:]}")
-        elif part.startswith("opts:"):
-            extras.append(f"Opts: {part[5:]}")
+    if key_path:
+        extras.append(f"Key: {key_path}")
+    if port and str(port) != "22":
+        extras.append(f"Port: {port}")
+    if opts:
+        extras.append(f"Opts: {opts}")
 
     display = f"{prefix}{user_ip}"
     if extras:
@@ -122,12 +127,33 @@ def _print_secret(secret, prefix):
     if secret["type"] == "ssh":
         click.echo(_get_ssh_display(secret, prefix))
         return
+    if secret["type"] == "password":
+        parsed = parse_secret_payload(secret.get("secret", ""), "password")
+        username = parsed.get("username", "")
+        password = parsed.get("password", "")
+        domain = parsed.get("domain", "")
+        if username or domain:
+            label_desc = f" for {username}" if username else ""
+            click.echo(f"🔐 Password{label_desc}: {password}")
+            if username:
+                click.echo(f"   👤 User: {username}")
+            if domain:
+                click.echo(f"   🌐 Domain: {domain}")
+            return
     click.echo(f"🔐 Secret: {secret['secret']}")
 
 
 def _copy_secret(secret):
     if secret["type"] == "ssh":
-        copy_to_clipboard(secret["secret"].split("|")[0])
+        parsed = parse_secret_payload(secret.get("secret", ""), "ssh")
+        user = parsed.get("user", "")
+        host = parsed.get("host", "")
+        conn = f"{user}:{host}" if user and host else (secret.get("secret", "").split("|")[0])
+        copy_to_clipboard(conn)
+        return
+    if secret["type"] == "password":
+        parsed = parse_secret_payload(secret.get("secret", ""), "password")
+        copy_to_clipboard(parsed.get("password", secret["secret"]))
         return
     copy_to_clipboard(secret["secret"])
 
@@ -190,7 +216,13 @@ def _save_vault_secret(store, vault_name, label, secret_type, arg1, arg2, key_pa
 @click.option("--key", "-k", "key_path", help="Path to SSH private key file.")
 @click.option("--port", "-p", "ssh_port", help="SSH port (default: 22).")
 @click.option("--opts", "-o", "ssh_opts", help="Additional SSH options.")
-@click.option("--vault", "-v", "vault_name", default=None, help="Save to a team vault instead of personal store.")
+@click.option(
+    "--vault",
+    "-v",
+    "vault_name",
+    default=None,
+    help="Save to a team vault instead of personal store.",
+)
 @click.argument("label", required=True)
 @click.argument("arg1", required=False)
 @click.argument("arg2", required=False)
@@ -204,7 +236,17 @@ def add(ctx, secret_type, key_path, ssh_port, ssh_opts, vault_name, label, arg1,
 
     # If targeting a vault, route through VaultManager
     if vault_name:
-        _save_vault_secret(store, vault_name, label, secret_type, arg1, arg2, key_path, ssh_port, ssh_opts)
+        _save_vault_secret(
+            store,
+            vault_name,
+            label,
+            secret_type,
+            arg1,
+            arg2,
+            key_path,
+            ssh_port,
+            ssh_opts,
+        )
         return
 
     if secret_type == "token":  # nosec B105

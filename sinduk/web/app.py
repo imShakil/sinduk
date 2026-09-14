@@ -7,6 +7,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 from ..store import SecretStore
 from ..vault import VaultManager, get_user_identity
+from ..helpers import parse_secret_payload, generate_secure_password
 from ..log import get_logger
 from .ssh_handler import SSHConnectionManager
 
@@ -113,8 +114,8 @@ def _serialize_vault_secret_row(s):
         "created_by": s[3],
         "creation_time": s[4],
         "update_time": s[5],
-        "creation_date": datetime.fromtimestamp(s[4]).strftime("%Y-%m-%d %H:%M") if s[4] else "",
-        "update_date": datetime.fromtimestamp(s[5]).strftime("%Y-%m-%d %H:%M") if s[5] else "",
+        "creation_date": (datetime.fromtimestamp(s[4]).strftime("%Y-%m-%d %H:%M") if s[4] else ""),
+        "update_date": (datetime.fromtimestamp(s[5]).strftime("%Y-%m-%d %H:%M") if s[5] else ""),
     }
 
 
@@ -216,6 +217,21 @@ def _register_secret_routes(app, store, require_auth):
     _register_update_secret_route(app, store, require_auth)
     _register_delete_secret_route(app, store, require_auth)
     _register_search_secrets_route(app, store, require_auth)
+    _register_generate_password_route(app, require_auth)
+
+
+def _register_generate_password_route(app, require_auth):
+    @app.route("/api/tools/generate-password", methods=["GET"])
+    @require_auth
+    def generate_pwd():
+        try:
+            length = request.args.get("length", 20, type=int)
+            length = max(8, min(length, 128))
+            pwd = generate_secure_password(length)
+            return jsonify({"password": pwd})
+        except Exception as e:
+            logger.error(f"Error generating password: {e}")
+            return jsonify({"error": str(e)}), 500
 
 
 def _register_get_secrets_route(app, store, require_auth):
@@ -344,7 +360,10 @@ def _register_backup_routes(app, store, require_auth):
             data = request.get_json()
             backup_password = data.get("password", "")
             if len(backup_password) < 6:
-                return jsonify({"error": "Backup password must be at least 6 characters"}), 400
+                return (
+                    jsonify({"error": "Backup password must be at least 6 characters"}),
+                    400,
+                )
             blob = store.export_encrypted_backup(backup_password)
             from flask import Response
 
@@ -418,7 +437,10 @@ def _register_ssh_connect_route(app, store, ssh_manager, require_auth):
                     ),
                     201,
                 )
-            return jsonify({"error": "SSH connection failed. Check credentials and host."}), 400
+            return (
+                jsonify({"error": "SSH connection failed. Check credentials and host."}),
+                400,
+            )
         except Exception as e:
             logger.error(f"SSH connect error: {e}")
             return jsonify({"error": str(e)}), 500
@@ -554,7 +576,10 @@ def _register_socket_ssh_connect_handler(socketio, store, ssh_manager):
                 )
                 _start_output_streaming(socketio, ssh_manager, connection_id)
             else:
-                emit("error", {"message": "SSH connection failed. Check credentials and host."})
+                emit(
+                    "error",
+                    {"message": "SSH connection failed. Check credentials and host."},
+                )
         except Exception as e:
             logger.error(f"WS SSH connect error: {e}")
             emit("error", {"message": str(e)})
@@ -629,21 +654,15 @@ def _resolve_stored_ssh(store, key_id):
         return "error:SSH server not found"
 
     ssh_data = secret.get("secret", "")
-    parts = ssh_data.split("|")
-    user_ip = parts[0]
+    parsed = parse_secret_payload(ssh_data, "ssh")
+    username = parsed.get("user", "")
+    hostname = parsed.get("host", "")
+    port = parsed.get("port", 22)
 
-    if ":" not in user_ip:
-        return "error:Invalid SSH secret format — expected user:host"
-
-    username, hostname = user_ip.split(":", 1)
-    port = 22
-
-    for part in parts[1:]:
-        if part.startswith("port:"):
-            try:
-                port = int(part[5:])
-            except ValueError:
-                pass
+    try:
+        port = int(port)
+    except (TypeError, ValueError):
+        port = 22
 
     if not username or not hostname:
         return "error:SSH secret is missing username or hostname"
@@ -913,8 +932,18 @@ def _register_add_vault_member_route(app, store, vault_manager, require_auth):
             public_key = data.get("public_key", "").strip() or None
             if not user_id or not user_name:
                 return jsonify({"error": "user_id and user_name are required"}), 400
-            vault_manager.add_member(vault_name, user_id, user_name, role, store.fernet, target_public_key=public_key)
-            return jsonify({"success": True, "message": f"Added {user_name} as {role}"}), 201
+            vault_manager.add_member(
+                vault_name,
+                user_id,
+                user_name,
+                role,
+                store.fernet,
+                target_public_key=public_key,
+            )
+            return (
+                jsonify({"success": True, "message": f"Added {user_name} as {role}"}),
+                201,
+            )
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
         except Exception as e:
@@ -975,7 +1004,14 @@ def _register_vault_crypto_routes(app, store, vault_manager, require_auth):
             role = data.get("role", "viewer")
             expires_hours = data.get("expires_hours", 24)
             token = vault_manager.create_vault_invite(vault_name, role, store.fernet, expires_in_hours=expires_hours)
-            return jsonify({"success": True, "token": token, "role": role, "expires_hours": expires_hours})
+            return jsonify(
+                {
+                    "success": True,
+                    "token": token,
+                    "role": role,
+                    "expires_hours": expires_hours,
+                }
+            )
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
         except Exception as e:

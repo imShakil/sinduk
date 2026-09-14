@@ -3,10 +3,15 @@ import subprocess  # nosec 604
 from ..store import SecretStore
 from ..log import get_logger
 from ..decorators import master_password_required
-from ..helpers import choice_one
+from ..helpers import choice_one, parse_secret_payload
 
 logger = get_logger("sinduk.commands.ssh")
-SAFE_SSH_OPTS = {"-o", "StrictHostKeyChecking=no", "UserKnownHostsFile=/dev/null", "ConnectTimeout=10"}
+SAFE_SSH_OPTS = {
+    "-o",
+    "StrictHostKeyChecking=no",
+    "UserKnownHostsFile=/dev/null",
+    "ConnectTimeout=10",
+}
 
 
 def _get_selected_secret(label, store):
@@ -31,22 +36,22 @@ def _get_selected_secret(label, store):
 
 
 def _extract_user_host(ssh_data):
-    parts = ssh_data.split("|")
-    user_ip = parts[0]
-    if ":" not in user_ip:
+    parsed = parse_secret_payload(ssh_data, "ssh")
+    user = parsed.get("user")
+    host = parsed.get("host")
+    if not user or not host:
         click.echo("❌ Invalid SSH format. Expected user:host")
         return None, None, None
-
-    user, ip = user_ip.split(":", 1)
-    return user, ip, parts
+    return user, host, parsed
 
 
 def _is_valid_username(user):
     return user.replace("-", "").replace("_", "").replace(".", "").isalnum()
 
 
-def _handle_key_option(cmd_parts, part):
-    key_path = part[4:]
+def _handle_key_option(cmd_parts, key_path):
+    if key_path.startswith("key:"):
+        key_path = key_path[4:]
     if not key_path or ".." in key_path:
         click.echo("❌ Invalid key path")
         return False
@@ -54,17 +59,21 @@ def _handle_key_option(cmd_parts, part):
     return True
 
 
-def _handle_port_option(cmd_parts, part):
-    port = part[5:]
-    if not port.isdigit() or not (1 <= int(port) <= 65535):
+def _handle_port_option(cmd_parts, port):
+    port_str = str(port)
+    if port_str.startswith("port:"):
+        port_str = port_str[5:]
+    if not port_str.isdigit() or not (1 <= int(port_str) <= 65535):
         click.echo("❌ Invalid port number")
         return False
-    cmd_parts.extend(["-p", port])
+    cmd_parts.extend(["-p", port_str])
     return True
 
 
-def _handle_opts_option(cmd_parts, part):
-    opts = part[5:].split()
+def _handle_opts_option(cmd_parts, opts_str):
+    if opts_str.startswith("opts:"):
+        opts_str = opts_str[5:]
+    opts = opts_str.split()
     if not all(opt in SAFE_SSH_OPTS or opt.startswith("-o") for opt in opts):
         click.echo("❌ Unsafe SSH options detected")
         return False
@@ -72,28 +81,9 @@ def _handle_opts_option(cmd_parts, part):
     return True
 
 
-def _option_handler_for_part(part):
-    if part.startswith("key:"):
-        return _handle_key_option
-    if part.startswith("port:"):
-        return _handle_port_option
-    if part.startswith("opts:"):
-        return _handle_opts_option
-    return None
-
-
-def _append_option_parts(cmd_parts, parts):
-    for part in parts[1:]:
-        handler = _option_handler_for_part(part)
-        if handler and not handler(cmd_parts, part):
-            return False
-
-    return True
-
-
 def _build_ssh_command(selected_secret):
-    user, ip, parts = _extract_user_host(selected_secret["secret"])
-    if not user:
+    user, ip, parsed = _extract_user_host(selected_secret["secret"])
+    if not user or not ip:
         return None, None, None
 
     if not _is_valid_username(user):
@@ -101,8 +91,20 @@ def _build_ssh_command(selected_secret):
         return None, None, None
 
     cmd_parts = ["ssh"]
-    if not _append_option_parts(cmd_parts, parts):
-        return None, None, None
+    port = parsed.get("port")
+    if port and str(port) != "22":
+        if not _handle_port_option(cmd_parts, port):
+            return None, None, None
+
+    key_path = parsed.get("key_path")
+    if key_path:
+        if not _handle_key_option(cmd_parts, key_path):
+            return None, None, None
+
+    opts = parsed.get("opts")
+    if opts:
+        if not _handle_opts_option(cmd_parts, opts):
+            return None, None, None
 
     cmd_parts.append(f"{user}@{ip}")
     return cmd_parts, user, ip

@@ -278,14 +278,23 @@ function doSearch(q) { S.query = q.toLowerCase(); renderGrid(); }
 async function quickCopy(id) {
   const res = await api('GET', `/api/secrets/${id}/reveal`);
   if (!res?.secret) return;
+  const s = S.secrets.find(x => x.id === id);
+  const type = res.type || s?.type || 'password';
   let text = res.secret;
-  // For SSH, copy just the connection string
-  if (res.type === 'ssh' || (S.secrets.find(s => s.id === id)?.type === 'ssh')) {
-    text = text.split('|')[0].replace(':', '@');
+
+  if (type === 'ssh') {
+    const { user, host, port } = parseSSHSecret(text);
+    text = user && host ? `${user}@${host}${port && port !== '22' ? ` -p ${port}` : ''}` : text.split('|')[0].replace(':', '@');
+  } else if (type === 'password') {
+    const { pass } = parsePasswordSecret(text);
+    text = pass || text;
+  } else {
+    text = parseTokenSecret(text);
   }
+
   try {
     await navigator.clipboard.writeText(text);
-    showToast('📋 Copied!');
+    showToast('📋 Copied to clipboard!');
   } catch {
     showToast('❌ Clipboard denied', 'error');
   }
@@ -297,7 +306,38 @@ function quickSSH(id) {
   // Switch to stored tab and pre-select
   const storedBtn = document.querySelector('[onclick*="stored"]');
   if (storedBtn) switchTab('ssh', 'stored', storedBtn);
-  document.getElementById('ssh-stored-select').value = id;
+  const sel = document.getElementById('ssh-stored-select');
+  if (sel) sel.value = id;
+}
+
+// ------------------------------------------------------------------
+// Password generator
+// ------------------------------------------------------------------
+function generateClientPassword(length = 20) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}<>?';
+  const array = new Uint32Array(length);
+  window.crypto.getRandomValues(array);
+  let pwd = '';
+  for (let i = 0; i < length; i++) {
+    pwd += chars[array[i] % chars.length];
+  }
+  if (!(/[A-Z]/.test(pwd) && /[a-z]/.test(pwd) && /\d/.test(pwd) && /[^A-Za-z0-9]/.test(pwd))) {
+    return generateClientPassword(length);
+  }
+  return pwd;
+}
+
+function handleGeneratePassword() {
+  const pwd = generateClientPassword(20);
+  const input = document.getElementById('edit-password');
+  if (input) {
+    input.value = pwd;
+    input.type = 'text';
+    const toggleBtn = input.parentElement?.querySelector('.pw-toggle');
+    if (toggleBtn) toggleBtn.textContent = '🙈';
+    updateStrength(pwd);
+    showToast('🎲 Strong password generated!');
+  }
 }
 
 // ------------------------------------------------------------------
@@ -310,6 +350,9 @@ function openAddModal() {
   document.getElementById('edit-label').disabled = false;
   document.getElementById('edit-type').value = 'password';
   document.getElementById('edit-type').disabled = false;
+  document.querySelectorAll('.type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === 'password');
+  });
   clearStrengthMeter();
   hide('edit-error');
   renderSecretTypeForm('password');
@@ -327,18 +370,61 @@ function openEditFromView() {
   document.getElementById('edit-label').disabled = true;
   document.getElementById('edit-type').value = s.type;
   document.getElementById('edit-type').disabled = true;
+  document.querySelectorAll('.type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === s.type);
+  });
   hide('edit-error');
   renderSecretTypeForm(s.type, S.currentSecret?.secret || '');
   show('edit-backdrop');
 }
 
+function selectType(type, btn) {
+  document.getElementById('edit-type').value = type;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+  renderSecretTypeForm(type);
+}
+
 function closeEditModal() { hide('edit-backdrop'); }
 
 function parsePasswordSecret(existingValue) {
-  const parts = existingValue ? existingValue.split(':') : [];
+  if (!existingValue) return { user: '', pass: '', domain: '' };
+
+  // Try JSON first
+  if (typeof existingValue === 'string' && existingValue.trim().startsWith('{') && existingValue.trim().endsWith('}')) {
+    try {
+      const obj = JSON.parse(existingValue);
+      if (typeof obj === 'object' && obj !== null) {
+        return {
+          user: obj.username || obj.user || '',
+          pass: obj.password || obj.pass || '',
+          domain: obj.domain || obj.url || '',
+        };
+      }
+    } catch { }
+  }
+
+  // Handle legacy with domain tag
+  let domain = '';
+  let userPass = existingValue;
+  if (userPass.includes('|domain:')) {
+    const parts = userPass.split('|domain:');
+    userPass = parts[0];
+    domain = parts[1].trim();
+  }
+
+  const colonIdx = userPass.indexOf(':');
+  if (colonIdx !== -1) {
+    return {
+      user: userPass.slice(0, colonIdx),
+      pass: userPass.slice(colonIdx + 1),
+      domain,
+    };
+  }
   return {
-    user: parts[0] || '',
-    pass: parts.slice(1).join(':') || '',
+    user: '',
+    pass: userPass,
+    domain,
   };
 }
 
@@ -348,42 +434,95 @@ function parseSSHSecret(existingValue) {
   let port = '22';
   let keyPath = '';
   let opts = '';
+  let password = '';
 
   if (!existingValue) {
-    return { user, host, port, keyPath, opts };
+    return { user, host, port, keyPath, opts, password };
+  }
+
+  if (typeof existingValue === 'string' && existingValue.trim().startsWith('{') && existingValue.trim().endsWith('}')) {
+    try {
+      const obj = JSON.parse(existingValue);
+      if (typeof obj === 'object' && obj !== null) {
+        return {
+          user: obj.user || obj.username || '',
+          host: obj.host || obj.hostname || '',
+          port: String(obj.port || '22'),
+          keyPath: obj.key_path || obj.keyPath || obj.key || '',
+          opts: obj.opts || obj.options || '',
+          password: obj.password || '',
+        };
+      }
+    } catch { }
   }
 
   const parts = existingValue.split('|');
   const userHost = parts[0];
   if (userHost.includes(':')) {
-    [user, host] = userHost.split(':', 2);
+    const up = userHost.split(':', 2);
+    user = up[0];
+    host = up[1];
+  } else if (userHost.includes('@')) {
+    const up = userHost.split('@', 2);
+    user = up[0];
+    host = up[1];
+  } else {
+    host = userHost;
   }
 
   parts.slice(1).forEach((part) => {
     if (part.startsWith('key:')) keyPath = part.slice(4);
     else if (part.startsWith('port:')) port = part.slice(5);
     else if (part.startsWith('opts:')) opts = part.slice(5);
+    else if (part.startsWith('pass:')) password = part.slice(5);
   });
 
-  return { user, host, port, keyPath, opts };
+  return { user, host, port, keyPath, opts, password };
+}
+
+function parseTokenSecret(existingValue) {
+  if (!existingValue) return '';
+  if (typeof existingValue === 'string' && existingValue.trim().startsWith('{') && existingValue.trim().endsWith('}')) {
+    try {
+      const obj = JSON.parse(existingValue);
+      if (typeof obj === 'object' && obj !== null) {
+        if (obj.token !== undefined) return String(obj.token);
+        if (obj.secret !== undefined) return String(obj.secret);
+      }
+    } catch { }
+  }
+  return existingValue;
 }
 
 function bindSSHPreviewListeners() {
-  ['ssh-edit-user', 'ssh-edit-host', 'ssh-edit-port', 'ssh-edit-key'].forEach((id) => {
+  ['ssh-edit-user', 'ssh-edit-host', 'ssh-edit-port', 'ssh-edit-key', 'ssh-edit-opts'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', updateSSHPreview);
   });
 }
 
 function renderPasswordTypeForm(container, existingValue) {
-  const { user, pass } = parsePasswordSecret(existingValue);
+  const { user, pass, domain } = parsePasswordSecret(existingValue);
   container.innerHTML = `
       <div class="field">
-        <label>Username</label>
-        <input type="text" id="edit-username" placeholder="username" value="${esc(user)}" autocomplete="off" />
+        <label for="edit-domain">Domain / Login URL <span class="optional-tag">optional — e.g. github.com or aws.amazon.com</span></label>
+        <div class="input-with-icon-wrap">
+          <span class="field-leading-icon">🌐</span>
+          <input type="text" id="edit-domain" placeholder="e.g. github.com or https://aws.amazon.com" value="${esc(domain)}" autocomplete="off" />
+        </div>
       </div>
       <div class="field">
-        <label>Password</label>
+        <label for="edit-username">Username / Email / Account</label>
+        <div class="input-with-icon-wrap">
+          <span class="field-leading-icon">👤</span>
+          <input type="text" id="edit-username" placeholder="username or email" value="${esc(user)}" autocomplete="off" />
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label-row">
+          <label for="edit-password">Password <span class="required-tag">*</span></label>
+          <button type="button" class="btn btn-ghost btn-xs btn-gen-pw" onclick="handleGeneratePassword()" title="Generate strong random password">🎲 Generate Strong</button>
+        </div>
         <div class="pw-input-wrap">
           <input type="password" id="edit-password" placeholder="password" value="${esc(pass)}"
             oninput="updateStrength(this.value)" autocomplete="new-password" />
@@ -395,15 +534,17 @@ function renderPasswordTypeForm(container, existingValue) {
         <div id="strength-label" class="strength-label"></div>
       </div>
     `;
+  if (pass) updateStrength(pass);
 }
 
 function renderTokenTypeForm(container, existingValue) {
+  const val = parseTokenSecret(existingValue);
   container.innerHTML = `
       <div class="field">
-        <label>Token / API Key</label>
+        <label for="edit-token">Token / API Key / Secret Text <span class="required-tag">*</span></label>
         <div class="pw-input-wrap">
-          <textarea id="edit-token" rows="3" placeholder="Paste your token or API key here"
-            oninput="updateStrength(this.value)">${esc(existingValue)}</textarea>
+          <textarea id="edit-token" rows="4" placeholder="Paste your token, API key, JWT, or private secret here"
+            oninput="updateStrength(this.value)">${esc(val)}</textarea>
           <button type="button" class="pw-toggle textarea-toggle" onclick="toggleTokenVisibility()">👁</button>
         </div>
         <div id="strength-bar-wrap" class="strength-wrap">
@@ -412,42 +553,43 @@ function renderTokenTypeForm(container, existingValue) {
         <div id="strength-label" class="strength-label"></div>
       </div>
     `;
+  if (val) updateStrength(val);
 }
 
 function renderSSHTypeForm(container, existingValue) {
-  const { user, host, port, keyPath, opts } = parseSSHSecret(existingValue);
+  const { user, host, port, keyPath, opts, password } = parseSSHSecret(existingValue);
   container.innerHTML = `
       <div class="ssh-form-grid">
         <div class="field">
-          <label>Username</label>
-          <input type="text" id="ssh-edit-user" placeholder="ubuntu" value="${esc(user)}" />
+          <label for="ssh-edit-user">Username <span class="required-tag">*</span></label>
+          <input type="text" id="ssh-edit-user" placeholder="ubuntu / root" value="${esc(user)}" />
         </div>
         <div class="field">
-          <label>Hostname / IP</label>
+          <label for="ssh-edit-host">Hostname / IP <span class="required-tag">*</span></label>
           <input type="text" id="ssh-edit-host" placeholder="192.168.1.100 or server.com" value="${esc(host)}" />
         </div>
         <div class="field">
-          <label>Port</label>
-          <input type="number" id="ssh-edit-port" placeholder="22" value="${esc(port)}" min="1" max="65535" />
+          <label for="ssh-edit-port">Port</label>
+          <input type="number" id="ssh-edit-port" placeholder="22" value="${esc(port || '22')}" min="1" max="65535" />
         </div>
         <div class="field">
-          <label>Key path <span class="optional-tag">optional</span></label>
+          <label for="ssh-edit-key">Key path <span class="optional-tag">optional</span></label>
           <input type="text" id="ssh-edit-key" placeholder="~/.ssh/id_rsa" value="${esc(keyPath)}" />
         </div>
       </div>
       <div class="field">
-        <label>Extra SSH options <span class="optional-tag">optional</span></label>
+        <label for="ssh-edit-opts">Extra SSH options <span class="optional-tag">optional</span></label>
         <input type="text" id="ssh-edit-opts" placeholder="-o StrictHostKeyChecking=no" value="${esc(opts)}" />
       </div>
       <div class="field">
-        <label>Password <span class="optional-tag">optional — for password auth</span></label>
+        <label for="ssh-edit-password">Password <span class="optional-tag">optional — for password auth</span></label>
         <div class="pw-input-wrap">
-          <input type="password" id="ssh-edit-password" placeholder="SSH password (leave blank for key auth)" autocomplete="new-password" />
+          <input type="password" id="ssh-edit-password" placeholder="SSH password (leave blank for key auth)" value="${esc(password)}" autocomplete="new-password" />
           <button type="button" class="pw-toggle" onclick="togglePwVisibility('ssh-edit-password', this)">👁</button>
         </div>
       </div>
       <div class="ssh-edit-preview" id="ssh-preview">
-        <span class="preview-label">Preview:</span>
+        <span class="preview-label">Preview Command:</span>
         <code id="ssh-preview-cmd">ssh ${user ? user + '@' : ''}${host || '<host>'}${port && port !== '22' ? ' -p ' + port : ''}${keyPath ? ' -i ' + keyPath : ''}</code>
       </div>
     `;
@@ -457,6 +599,7 @@ function renderSSHTypeForm(container, existingValue) {
 // Render the right input fields based on secret type
 function renderSecretTypeForm(type, existingValue = '') {
   const container = document.getElementById('edit-fields-container');
+  if (!container) return;
 
   switch (type) {
     case 'password':
@@ -478,9 +621,11 @@ function updateSSHPreview() {
   const host = document.getElementById('ssh-edit-host')?.value || '<host>';
   const port = document.getElementById('ssh-edit-port')?.value || '22';
   const key = document.getElementById('ssh-edit-key')?.value || '';
+  const opts = document.getElementById('ssh-edit-opts')?.value || '';
   const portPart = port && port !== '22' ? ` -p ${port}` : '';
   const keyPart = key ? ` -i ${key}` : '';
-  const cmd = `ssh ${user ? user + '@' : ''}${host}${portPart}${keyPart}`;
+  const optsPart = opts ? ` ${opts}` : '';
+  const cmd = `ssh ${user ? user + '@' : ''}${host}${portPart}${keyPart}${optsPart}`;
   const el = document.getElementById('ssh-preview-cmd');
   if (el) el.textContent = cmd;
 }
@@ -493,8 +638,8 @@ function onEditTypeChange() {
 function togglePwVisibility(inputId, btn) {
   const input = document.getElementById(inputId);
   if (!input) return;
-  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
-  else { input.type = 'password'; btn.textContent = '👁'; }
+  if (input.type === 'password') { input.type = 'text'; if (btn) btn.textContent = '🙈'; }
+  else { input.type = 'password'; if (btn) btn.textContent = '👁'; }
 }
 
 function toggleTokenVisibility() {
@@ -552,23 +697,21 @@ function collectSecretValue(type) {
   if (type === 'password') {
     const user = document.getElementById('edit-username')?.value.trim() || '';
     const pass = document.getElementById('edit-password')?.value || '';
-    if (!user || !pass) return null;
-    return `${user}:${pass}`;
+    const domain = document.getElementById('edit-domain')?.value.trim() || '';
+    if (!pass) return null;
+    return JSON.stringify({ username: user, password: pass, domain });
   } else if (type === 'token') {
-    const token = document.getElementById('edit-token')?.value.trim() || '';
-    return token || null;
+    const token = document.getElementById('edit-token')?.value || '';
+    return token.trim() ? token : null;
   } else if (type === 'ssh') {
     const user = document.getElementById('ssh-edit-user')?.value.trim() || '';
     const host = document.getElementById('ssh-edit-host')?.value.trim() || '';
-    const port = document.getElementById('ssh-edit-port')?.value.trim() || '22';
+    const port = parseInt(document.getElementById('ssh-edit-port')?.value || '22', 10) || 22;
     const key = document.getElementById('ssh-edit-key')?.value.trim() || '';
     const opts = document.getElementById('ssh-edit-opts')?.value.trim() || '';
+    const password = document.getElementById('ssh-edit-password')?.value || '';
     if (!user || !host) return null;
-    let val = `${user}:${host}`;
-    if (key) val += `|key:${key}`;
-    if (port && port !== '22') val += `|port:${port}`;
-    if (opts) val += `|opts:${opts}`;
-    return val;
+    return JSON.stringify({ user, host, port, key_path: key, opts, password });
   }
   return null;
 }
@@ -580,7 +723,7 @@ async function saveSecret() {
 
   if (!label) return showMsg('edit-error', 'error', 'Label is required.');
   if (!secret) {
-    const fieldHints = { password: 'username and password', token: 'token value', ssh: 'username and hostname' };
+    const fieldHints = { password: 'a password value', token: 'token value', ssh: 'username and hostname' };
     return showMsg('edit-error', 'error', `Please fill in ${fieldHints[type] || 'all required fields'}.`);
   }
   hide('edit-error');
@@ -627,9 +770,15 @@ async function openViewModal(id) {
     createdByRow?.classList.add('hidden');
   }
 
-  // Show SSH-specific connect button
+  // Show/hide type-specific buttons
   const sshBtn = document.getElementById('view-ssh-btn');
   if (sshBtn) sshBtn.style.display = s.type === 'ssh' ? 'inline-flex' : 'none';
+
+  const userBtn = document.getElementById('copy-username-btn');
+  if (userBtn) userBtn.style.display = s.type === 'password' ? 'inline-flex' : 'none';
+
+  const domainBtn = document.getElementById('copy-domain-btn');
+  if (domainBtn) domainBtn.style.display = 'none';
 
   setRevealMasked();
   hide('view-msg');
@@ -646,19 +795,38 @@ function setRevealMasked() {
 
 function setRevealVisible(text, type) {
   const el = document.getElementById('reveal-text');
-  // Pretty-print based on type
+  const domainBtn = document.getElementById('copy-domain-btn');
+  const userBtn = document.getElementById('copy-username-btn');
+
   if (type === 'ssh') {
     el.innerHTML = formatSSHDisplay(text);
+    if (userBtn) userBtn.style.display = 'none';
+    if (domainBtn) domainBtn.style.display = 'none';
   } else if (type === 'password') {
-    const parts = text.split(':');
-    if (parts.length >= 2) {
-      el.innerHTML = `<span class="reveal-field-label">user:</span><span>${esc(parts[0])}</span>  <span class="reveal-field-label">pass:</span><span>${esc(parts.slice(1).join(':'))}</span>`;
+    const { user, pass, domain } = parsePasswordSecret(text);
+    let html = '';
+    if (domain) {
+      const cleanUrl = domain.startsWith('http') ? domain : `https://${domain}`;
+      html += `<div class="reveal-structured-row"><span class="reveal-field-label">🌐 Domain:</span><a href="${esc(cleanUrl)}" target="_blank" rel="noopener noreferrer" class="reveal-domain-link">${esc(domain)} ↗</a></div>`;
+      if (domainBtn) domainBtn.style.display = 'inline-flex';
     } else {
-      el.textContent = text;
+      if (domainBtn) domainBtn.style.display = 'none';
     }
+    if (user) {
+      html += `<div class="reveal-structured-row"><span class="reveal-field-label">👤 User:</span><span>${esc(user)}</span></div>`;
+      if (userBtn) userBtn.style.display = 'inline-flex';
+    } else {
+      if (userBtn) userBtn.style.display = 'none';
+    }
+    html += `<div class="reveal-structured-row"><span class="reveal-field-label">🔑 Pass:</span><span class="reveal-pw-val">${esc(pass)}</span></div>`;
+    el.innerHTML = html;
   } else {
-    el.textContent = text;
+    const val = parseTokenSecret(text);
+    el.innerHTML = `<pre class="reveal-token-pre"><code>${esc(val)}</code></pre>`;
+    if (userBtn) userBtn.style.display = 'none';
+    if (domainBtn) domainBtn.style.display = 'none';
   }
+
   el.classList.remove('masked');
   document.getElementById('reveal-toggle-btn').textContent = '🙈 Hide';
   clearTimeout(S.revealTimer);
@@ -666,14 +834,14 @@ function setRevealVisible(text, type) {
 }
 
 function formatSSHDisplay(raw) {
-  const parts = raw.split('|');
-  const userHost = parts[0];
-  let html = `<span class="reveal-field-label">conn:</span><span>${esc(userHost.replace(':', '@'))}</span>`;
-  parts.slice(1).forEach(p => {
-    if (p.startsWith('key:')) html += `  <span class="reveal-field-label">key:</span><span>${esc(p.slice(4))}</span>`;
-    else if (p.startsWith('port:')) html += `  <span class="reveal-field-label">port:</span><span>${esc(p.slice(5))}</span>`;
-    else if (p.startsWith('opts:')) html += `  <span class="reveal-field-label">opts:</span><span>${esc(p.slice(5))}</span>`;
-  });
+  const { user, host, port, keyPath, opts, password } = parseSSHSecret(raw);
+  const connCmd = `ssh ${user ? user + '@' : ''}${host}${port && port !== '22' ? ' -p ' + port : ''}${keyPath ? ' -i ' + keyPath : ''}${opts ? ' ' + opts : ''}`;
+
+  let html = `<div class="reveal-structured-row"><span class="reveal-field-label">🖥️ Server:</span><span>${esc(user ? user + '@' : '')}${esc(host)}${port && port !== '22' ? ':' + esc(port) : ''}</span></div>`;
+  if (keyPath) html += `<div class="reveal-structured-row"><span class="reveal-field-label">🔑 Key:</span><span>${esc(keyPath)}</span></div>`;
+  if (opts) html += `<div class="reveal-structured-row"><span class="reveal-field-label">⚙️ Opts:</span><span>${esc(opts)}</span></div>`;
+  if (password) html += `<div class="reveal-structured-row"><span class="reveal-field-label">🔒 Pass:</span><span>${esc(password)}</span></div>`;
+  html += `<div class="reveal-cmd-box"><code>${esc(connCmd)}</code></div>`;
   return html;
 }
 
@@ -704,13 +872,17 @@ async function copySecret() {
   if (text === null) return showMsg('view-msg', 'error', 'Failed to retrieve secret.');
   const s = S.secrets.find(x => x.id === S.currentId);
   let copyText = text;
-  // For SSH copy the connection string (user@host)
-  if (s?.type === 'ssh') copyText = text.split('|')[0].replace(':', '@');
-  // For password, let user choose — default copy just password part
-  if (s?.type === 'password') {
-    const parts = text.split(':');
-    copyText = parts.length >= 2 ? parts.slice(1).join(':') : text;
+
+  if (s?.type === 'ssh') {
+    const { user, host, port, keyPath, opts } = parseSSHSecret(text);
+    copyText = `ssh ${user ? user + '@' : ''}${host}${port && port !== '22' ? ' -p ' + port : ''}${keyPath ? ' -i ' + keyPath : ''}${opts ? ' ' + opts : ''}`;
+  } else if (s?.type === 'password') {
+    const { pass } = parsePasswordSecret(text);
+    copyText = pass || text;
+  } else {
+    copyText = parseTokenSecret(text);
   }
+
   try {
     await navigator.clipboard.writeText(copyText);
     showMsg('view-msg', 'success', '📋 Copied to clipboard!');
@@ -720,7 +892,7 @@ async function copySecret() {
   }
 }
 
-// Copy full secret (for password: user:pass, for ssh: full string)
+// Copy full secret
 async function copyFullSecret() {
   const text = await fetchSecret();
   if (text === null) return showMsg('view-msg', 'error', 'Failed to retrieve secret.');
@@ -739,10 +911,26 @@ async function copyUsername() {
   if (text === null) return;
   const s = S.secrets.find(x => x.id === S.currentId);
   if (s?.type !== 'password') return;
-  const username = text.split(':')[0];
+  const { user } = parsePasswordSecret(text);
+  if (!user) return;
   try {
-    await navigator.clipboard.writeText(username);
-    showMsg('view-msg', 'success', '📋 Username copied!');
+    await navigator.clipboard.writeText(user);
+    showMsg('view-msg', 'success', '👤 Username copied!');
+    setTimeout(() => hide('view-msg'), 2500);
+  } catch { }
+}
+
+// Copy domain specifically (for password type)
+async function copyDomain() {
+  const text = await fetchSecret();
+  if (text === null) return;
+  const s = S.secrets.find(x => x.id === S.currentId);
+  if (s?.type !== 'password') return;
+  const { domain } = parsePasswordSecret(text);
+  if (!domain) return;
+  try {
+    await navigator.clipboard.writeText(domain);
+    showMsg('view-msg', 'success', '🌐 Domain copied!');
     setTimeout(() => hide('view-msg'), 2500);
   } catch { }
 }
