@@ -57,6 +57,69 @@ def generate_secure_password(length: int = 20) -> str:
             return pwd
 
 
+def _parse_legacy_password(raw_str: str) -> dict:
+    """Parse legacy password format: username:password or username:password|domain:example.com."""
+    domain = ""
+    user_pass = raw_str
+    if "|domain:" in raw_str:
+        parts = raw_str.split("|domain:", 1)
+        user_pass = parts[0]
+        domain = parts[1].strip()
+
+    if ":" in user_pass:
+        parts = user_pass.split(":", 1)
+        return {
+            "username": parts[0],
+            "password": parts[1],
+            "domain": domain,
+        }
+    return {
+        "username": "",
+        "password": user_pass,
+        "domain": domain,
+    }
+
+
+def _parse_legacy_ssh(raw_str: str) -> dict:
+    """Parse legacy SSH format: user:host|key:path|port:22|opts:-o..."""
+    parts = raw_str.split("|")
+    user_host = parts[0]
+    user, host = "", user_host
+    if ":" in user_host:
+        u_parts = user_host.split(":", 1)
+        user, host = u_parts[0], u_parts[1]
+    elif "@" in user_host:
+        u_parts = user_host.split("@", 1)
+        user, host = u_parts[0], u_parts[1]
+
+    port = 22
+    key_path = ""
+    opts = ""
+    password = ""
+
+    for part in parts[1:]:
+        if part.startswith("key:"):
+            key_path = part[4:]
+        elif part.startswith("port:"):
+            try:
+                port = int(part[5:])
+            except ValueError:
+                port = 22
+        elif part.startswith("opts:"):
+            opts = part[5:]
+        elif part.startswith("pass:"):
+            password = part[5:]
+
+    return {
+        "user": user,
+        "host": host,
+        "port": port,
+        "key_path": key_path,
+        "opts": opts,
+        "password": password,
+    }
+
+
 def parse_secret_payload(raw: str, secret_type: str = "password") -> dict:  # nosec B107
     """
     Parse a raw secret payload into a structured dictionary.
@@ -73,71 +136,14 @@ def parse_secret_payload(raw: str, secret_type: str = "password") -> dict:  # no
             data = json.loads(raw_str)
             if isinstance(data, dict):
                 return data
-        except (json.JSONDecodeError, ValueError, TypeError):
+        except (ValueError, TypeError):
             pass  # nosec B110
 
     if secret_type == "password":
-        # Legacy format: username:password or username:password|domain:example.com
-        domain = ""
-        user_pass = raw_str
-        if "|domain:" in raw_str:
-            parts = raw_str.split("|domain:", 1)
-            user_pass = parts[0]
-            domain = parts[1].strip()
-
-        if ":" in user_pass:
-            parts = user_pass.split(":", 1)
-            return {
-                "username": parts[0],
-                "password": parts[1],
-                "domain": domain,
-            }
-        return {
-            "username": "",
-            "password": user_pass,
-            "domain": domain,
-        }
+        return _parse_legacy_password(raw_str)
 
     if secret_type == "ssh":
-        # Legacy format: user:host|key:path|port:22|opts:-o...
-        parts = raw_str.split("|")
-        user_host = parts[0]
-        user, host = "", ""
-        if ":" in user_host:
-            u_parts = user_host.split(":", 1)
-            user, host = u_parts[0], u_parts[1]
-        elif "@" in user_host:
-            u_parts = user_host.split("@", 1)
-            user, host = u_parts[0], u_parts[1]
-        else:
-            host = user_host
-
-        port = 22
-        key_path = ""
-        opts = ""
-        password = ""
-
-        for part in parts[1:]:
-            if part.startswith("key:"):
-                key_path = part[4:]
-            elif part.startswith("port:"):
-                try:
-                    port = int(part[5:])
-                except ValueError:
-                    port = 22
-            elif part.startswith("opts:"):
-                opts = part[5:]
-            elif part.startswith("pass:"):
-                password = part[5:]
-
-        return {
-            "user": user,
-            "host": host,
-            "port": port,
-            "key_path": key_path,
-            "opts": opts,
-            "password": password,
-        }
+        return _parse_legacy_ssh(raw_str)
 
     # Default / token type
     return {"token": raw_str}

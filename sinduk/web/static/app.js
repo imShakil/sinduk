@@ -284,7 +284,12 @@ async function quickCopy(id) {
 
   if (type === 'ssh') {
     const { user, host, port } = parseSSHSecret(text);
-    text = user && host ? `${user}@${host}${port && port !== '22' ? ` -p ${port}` : ''}` : text.split('|')[0].replace(':', '@');
+    if (user && host) {
+      const portPart = port && port !== '22' ? ` -p ${port}` : '';
+      text = `${user}@${host}${portPart}`;
+    } else {
+      text = text.split('|')[0].replace(':', '@');
+    }
   } else if (type === 'password') {
     const { pass } = parsePasswordSecret(text);
     text = pass || text;
@@ -706,7 +711,7 @@ function collectSecretValue(type) {
   } else if (type === 'ssh') {
     const user = document.getElementById('ssh-edit-user')?.value.trim() || '';
     const host = document.getElementById('ssh-edit-host')?.value.trim() || '';
-    const port = parseInt(document.getElementById('ssh-edit-port')?.value || '22', 10) || 22;
+    const port = Number.parseInt(document.getElementById('ssh-edit-port')?.value || '22', 10) || 22;
     const key = document.getElementById('ssh-edit-key')?.value.trim() || '';
     const opts = document.getElementById('ssh-edit-opts')?.value.trim() || '';
     const password = document.getElementById('ssh-edit-password')?.value || '';
@@ -793,6 +798,34 @@ function setRevealMasked() {
   clearTimeout(S.revealTimer);
 }
 
+function formatPasswordDisplay(text, { domainBtn, userBtn } = {}) {
+  const { user, pass, domain } = parsePasswordSecret(text);
+  let html = '';
+
+  if (domain) {
+    const cleanUrl = domain.startsWith('http') ? domain : `https://${domain}`;
+    html += `<div class="reveal-structured-row"><span class="reveal-field-label">🌐 Domain:</span><a href="${esc(cleanUrl)}" target="_blank" rel="noopener noreferrer" class="reveal-domain-link">${esc(domain)} ↗</a></div>`;
+  }
+  if (domainBtn) {
+    domainBtn.style.display = domain ? 'inline-flex' : 'none';
+  }
+
+  if (user) {
+    html += `<div class="reveal-structured-row"><span class="reveal-field-label">👤 User:</span><span>${esc(user)}</span></div>`;
+  }
+  if (userBtn) {
+    userBtn.style.display = user ? 'inline-flex' : 'none';
+  }
+
+  html += `<div class="reveal-structured-row"><span class="reveal-field-label">🔑 Pass:</span><span class="reveal-pw-val">${esc(pass)}</span></div>`;
+  return html;
+}
+
+function formatTokenDisplay(text) {
+  const val = parseTokenSecret(text);
+  return `<pre class="reveal-token-pre"><code>${esc(val)}</code></pre>`;
+}
+
 function setRevealVisible(text, type) {
   const el = document.getElementById('reveal-text');
   const domainBtn = document.getElementById('copy-domain-btn');
@@ -803,26 +836,9 @@ function setRevealVisible(text, type) {
     if (userBtn) userBtn.style.display = 'none';
     if (domainBtn) domainBtn.style.display = 'none';
   } else if (type === 'password') {
-    const { user, pass, domain } = parsePasswordSecret(text);
-    let html = '';
-    if (domain) {
-      const cleanUrl = domain.startsWith('http') ? domain : `https://${domain}`;
-      html += `<div class="reveal-structured-row"><span class="reveal-field-label">🌐 Domain:</span><a href="${esc(cleanUrl)}" target="_blank" rel="noopener noreferrer" class="reveal-domain-link">${esc(domain)} ↗</a></div>`;
-      if (domainBtn) domainBtn.style.display = 'inline-flex';
-    } else {
-      if (domainBtn) domainBtn.style.display = 'none';
-    }
-    if (user) {
-      html += `<div class="reveal-structured-row"><span class="reveal-field-label">👤 User:</span><span>${esc(user)}</span></div>`;
-      if (userBtn) userBtn.style.display = 'inline-flex';
-    } else {
-      if (userBtn) userBtn.style.display = 'none';
-    }
-    html += `<div class="reveal-structured-row"><span class="reveal-field-label">🔑 Pass:</span><span class="reveal-pw-val">${esc(pass)}</span></div>`;
-    el.innerHTML = html;
+    el.innerHTML = formatPasswordDisplay(text, { domainBtn, userBtn });
   } else {
-    const val = parseTokenSecret(text);
-    el.innerHTML = `<pre class="reveal-token-pre"><code>${esc(val)}</code></pre>`;
+    el.innerHTML = formatTokenDisplay(text);
     if (userBtn) userBtn.style.display = 'none';
     if (domainBtn) domainBtn.style.display = 'none';
   }
@@ -833,11 +849,21 @@ function setRevealVisible(text, type) {
   S.revealTimer = setTimeout(setRevealMasked, 30000);
 }
 
+function buildSSHCommandString({ user, host, port, keyPath, opts }) {
+  const userPart = user ? `${user}@` : '';
+  const portPart = port && String(port) !== '22' ? ` -p ${port}` : '';
+  const keyPart = keyPath ? ` -i ${keyPath}` : '';
+  const optsPart = opts ? ` ${opts}` : '';
+  return `ssh ${userPart}${host || '<host>'}${portPart}${keyPart}${optsPart}`;
+}
+
 function formatSSHDisplay(raw) {
   const { user, host, port, keyPath, opts, password } = parseSSHSecret(raw);
-  const connCmd = `ssh ${user ? user + '@' : ''}${host}${port && port !== '22' ? ' -p ' + port : ''}${keyPath ? ' -i ' + keyPath : ''}${opts ? ' ' + opts : ''}`;
+  const connCmd = buildSSHCommandString({ user, host, port, keyPath, opts });
+  const userHost = user ? `${user}@${host}` : host;
+  const serverDisplay = port && String(port) !== '22' ? `${userHost}:${port}` : userHost;
 
-  let html = `<div class="reveal-structured-row"><span class="reveal-field-label">🖥️ Server:</span><span>${esc(user ? user + '@' : '')}${esc(host)}${port && port !== '22' ? ':' + esc(port) : ''}</span></div>`;
+  let html = `<div class="reveal-structured-row"><span class="reveal-field-label">🖥️ Server:</span><span>${esc(serverDisplay)}</span></div>`;
   if (keyPath) html += `<div class="reveal-structured-row"><span class="reveal-field-label">🔑 Key:</span><span>${esc(keyPath)}</span></div>`;
   if (opts) html += `<div class="reveal-structured-row"><span class="reveal-field-label">⚙️ Opts:</span><span>${esc(opts)}</span></div>`;
   if (password) html += `<div class="reveal-structured-row"><span class="reveal-field-label">🔒 Pass:</span><span>${esc(password)}</span></div>`;
@@ -875,7 +901,7 @@ async function copySecret() {
 
   if (s?.type === 'ssh') {
     const { user, host, port, keyPath, opts } = parseSSHSecret(text);
-    copyText = `ssh ${user ? user + '@' : ''}${host}${port && port !== '22' ? ' -p ' + port : ''}${keyPath ? ' -i ' + keyPath : ''}${opts ? ' ' + opts : ''}`;
+    copyText = buildSSHCommandString({ user, host, port, keyPath, opts });
   } else if (s?.type === 'password') {
     const { pass } = parsePasswordSecret(text);
     copyText = pass || text;
