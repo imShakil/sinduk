@@ -548,10 +548,10 @@ function renderTokenTypeForm(container, existingValue) {
   const { tokenId, token } = parseTokenSecret(existingValue);
   container.innerHTML = `
       <div class="field">
-        <label for="edit-token-id">Key ID / Client ID <span class="optional-tag">optional — for AWS, OAuth, API key pairs</span></label>
+        <label for="edit-token-id">Key ID / Client ID <span class="optional-tag">optional — for OAuth, API key pairs</span></label>
         <div class="input-with-icon-wrap">
           <span class="field-leading-icon">🏷️</span>
-          <input type="text" id="edit-token-id" placeholder="e.g. AKIAIOSFODNN7EXAMPLE, client_id, rzp_live_..." value="${esc(tokenId)}" autocomplete="off" />
+          <input type="text" id="edit-token-id" placeholder="e.g. client_id, key_id, access_key..." value="${esc(tokenId)}" autocomplete="off" />
         </div>
       </div>
       <div class="field">

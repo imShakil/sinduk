@@ -21,31 +21,31 @@ def test_generate_secure_password():
 
 
 def test_parse_and_serialize_password_json():
-    serialized = serialize_password_secret("alice", "p@ss:w0rd!#123", "github.com")
+    serialized = serialize_password_secret("alice", "sample_password_val_1", "example.com")
     parsed = parse_secret_payload(serialized, "password")
 
     assert parsed["username"] == "alice"
-    assert parsed["password"] == "p@ss:w0rd!#123"
-    assert parsed["domain"] == "github.com"
+    assert parsed["password"] == "sample_password_val_1"
+    assert parsed["domain"] == "example.com"
 
 
 def test_parse_password_legacy_formats():
     # Standard user:pass
-    parsed1 = parse_secret_payload("bob:secret123", "password")
+    parsed1 = parse_secret_payload("bob:test_pass_sample", "password")
     assert parsed1["username"] == "bob"
-    assert parsed1["password"] == "secret123"
+    assert parsed1["password"] == "test_pass_sample"
     assert parsed1["domain"] == ""
 
     # Legacy with |domain:
-    parsed2 = parse_secret_payload("charlie:mypass|domain:console.aws.amazon.com", "password")
+    parsed2 = parse_secret_payload("charlie:sample_password_val|domain:console.example.com", "password")
     assert parsed2["username"] == "charlie"
-    assert parsed2["password"] == "mypass"
-    assert parsed2["domain"] == "console.aws.amazon.com"
+    assert parsed2["password"] == "sample_password_val"
+    assert parsed2["domain"] == "console.example.com"
 
     # Password with colons in legacy format
-    parsed3 = parse_secret_payload("dave:my:complex:password", "password")
+    parsed3 = parse_secret_payload("dave:my:sample:password:val", "password")
     assert parsed3["username"] == "dave"
-    assert parsed3["password"] == "my:complex:password"
+    assert parsed3["password"] == "my:sample:password:val"
 
 
 def test_parse_and_serialize_ssh_json():
@@ -55,7 +55,7 @@ def test_parse_and_serialize_ssh_json():
         port=2222,
         key_path="~/.ssh/id_ed25519",
         opts="-o StrictHostKeyChecking=no",
-        password="sshpass123",
+        password="test_ssh_pass_val",
     )
     parsed = parse_secret_payload(serialized, "ssh")
 
@@ -64,7 +64,7 @@ def test_parse_and_serialize_ssh_json():
     assert parsed["port"] == 2222
     assert parsed["key_path"] == "~/.ssh/id_ed25519"
     assert parsed["opts"] == "-o StrictHostKeyChecking=no"
-    assert parsed["password"] == "sshpass123"
+    assert parsed["password"] == "test_ssh_pass_val"
 
 
 def test_parse_ssh_legacy_formats():
@@ -76,25 +76,25 @@ def test_parse_ssh_legacy_formats():
     assert parsed1["key_path"] == "/path/to/key"
     assert parsed1["opts"] == "-o ConnectTimeout=5"
 
-    legacy2 = "admin@prod.example.com|pass:secretpass"
+    legacy2 = "admin@prod.example.com|pass:test_legacy_pass_str"
     parsed2 = parse_secret_payload(legacy2, "ssh")
     assert parsed2["user"] == "admin"
     assert parsed2["host"] == "prod.example.com"
-    assert parsed2["password"] == "secretpass"
+    assert parsed2["password"] == "test_legacy_pass_str"
 
 
 def test_parse_and_serialize_token_secret():
     # Single token serialization
-    tok_simple = serialize_token_secret("ghp_1234567890abcdef")
-    assert tok_simple == "ghp_1234567890abcdef"
+    tok_simple = serialize_token_secret("sample_mock_token_string_123")
+    assert tok_simple == "sample_mock_token_string_123"
     parsed1 = parse_secret_payload(tok_simple, "token")
-    assert parsed1["token"] == "ghp_1234567890abcdef"
+    assert parsed1["token"] == "sample_mock_token_string_123"
 
     # Token ID + Secret Pair serialization
-    tok_pair = serialize_token_secret("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", token_id="AKIAIOSFODNN7EXAMPLE")
+    tok_pair = serialize_token_secret("mock_api_secret_key_sample_456", token_id="mock_api_key_id_sample_123")
     parsed_pair = parse_secret_payload(tok_pair, "token")
-    assert parsed_pair["token_id"] == "AKIAIOSFODNN7EXAMPLE"
-    assert parsed_pair["token"] == "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    assert parsed_pair["token_id"] == "mock_api_key_id_sample_123"
+    assert parsed_pair["token"] == "mock_api_secret_key_sample_456"
 
     # Direct JSON dictionary with custom client_id
     token_json = json.dumps({"client_id": "oauth_client_1", "client_secret": "oauth_secret_2"})
