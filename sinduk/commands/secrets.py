@@ -5,7 +5,7 @@ from ..store import SecretStore
 from ..vault import VaultManager
 from ..log import get_logger
 from ..decorators import master_password_required
-from ..helpers import choice_one, copy_to_clipboard, parse_secret_payload
+from ..helpers import choice_one, copy_to_clipboard, parse_secret_payload, serialize_token_secret
 from ..ssh_utils import suggest_ssh_hosts
 
 logger = get_logger("sinduk.commands.secrets")
@@ -68,8 +68,12 @@ def _append_ssh_parts(user_ip, key_path, ssh_port, ssh_opts):
     return ssh_data
 
 
-def _save_token_secret(store, label, arg1):
-    secret = arg1 if arg1 else getpass("🔐 Enter token: ")
+def _save_token_secret(store, label, arg1, arg2=None):
+    if arg1 and arg2:
+        secret = serialize_token_secret(token=arg2, token_id=arg1)
+    else:
+        raw_tok = arg1 if arg1 else getpass("🔐 Enter token: ")
+        secret = serialize_token_secret(token=raw_tok)
     store.save_secret(label, secret, "token")
     logger.info(f"Token saved for label: {label}")
     click.echo("✅ Token saved.")
@@ -123,23 +127,41 @@ def _get_ssh_display(secret, prefix):
     return display
 
 
+def _print_password_secret(secret):
+    parsed = parse_secret_payload(secret.get("secret", ""), "password")
+    username = parsed.get("username", "")
+    password = parsed.get("password", "")
+    domain = parsed.get("domain", "")
+    if username or domain:
+        label_desc = f" for {username}" if username else ""
+        click.echo(f"🔐 Password{label_desc}: {password}")
+        if username:
+            click.echo(f"   👤 User: {username}")
+        if domain:
+            click.echo(f"   🌐 Domain: {domain}")
+        return
+    click.echo(f"🔐 Secret: {secret['secret']}")
+
+
+def _print_token_secret(secret):
+    parsed = parse_secret_payload(secret.get("secret", ""), "token")
+    token_id = parsed.get("token_id") or parsed.get("client_id", "")
+    token_val = parsed.get("token") or parsed.get("token_secret", secret.get("secret", ""))
+    click.echo(f"🔐 Secret: {token_val}")
+    if token_id:
+        click.echo(f"   🏷️ Key ID: {token_id}")
+
+
 def _print_secret(secret, prefix):
     if secret["type"] == "ssh":
         click.echo(_get_ssh_display(secret, prefix))
         return
     if secret["type"] == "password":
-        parsed = parse_secret_payload(secret.get("secret", ""), "password")
-        username = parsed.get("username", "")
-        password = parsed.get("password", "")
-        domain = parsed.get("domain", "")
-        if username or domain:
-            label_desc = f" for {username}" if username else ""
-            click.echo(f"🔐 Password{label_desc}: {password}")
-            if username:
-                click.echo(f"   👤 User: {username}")
-            if domain:
-                click.echo(f"   🌐 Domain: {domain}")
-            return
+        _print_password_secret(secret)
+        return
+    if secret["type"] == "token":
+        _print_token_secret(secret)
+        return
     click.echo(f"🔐 Secret: {secret['secret']}")
 
 
@@ -154,6 +176,10 @@ def _copy_secret(secret):
     if secret["type"] == "password":
         parsed = parse_secret_payload(secret.get("secret", ""), "password")
         copy_to_clipboard(parsed.get("password", secret["secret"]))
+        return
+    if secret["type"] == "token":
+        parsed = parse_secret_payload(secret.get("secret", ""), "token")
+        copy_to_clipboard(parsed.get("token") or parsed.get("token_secret", secret["secret"]))
         return
     copy_to_clipboard(secret["secret"])
 
@@ -181,7 +207,10 @@ def _prompt_updated_ssh_secret(current_ssh):
 
 def _resolve_secret_payload(secret_type, arg1, arg2, key_path, ssh_port, ssh_opts):
     if secret_type == "token":  # nosec B105
-        return arg1 if arg1 else getpass("🔐 Enter token: ")
+        if arg1 and arg2:
+            return serialize_token_secret(token=arg2, token_id=arg1)
+        raw_tok = arg1 if arg1 else getpass("🔐 Enter token: ")
+        return serialize_token_secret(token=raw_tok)
     if secret_type == "password":  # nosec B105
         username = arg1 if arg1 else click.prompt("Enter username")
         password = arg2 if arg2 else getpass("🔐 Enter password: ")
@@ -196,26 +225,28 @@ def _save_vault_secret(store, vault_name, label, secret_type, arg1, arg2, key_pa
         click.echo(NO_MASTER_KEY_MSG)
         return
     fernet = store.fernet
-    payload = _resolve_secret_payload(secret_type, arg1, arg2, key_path, ssh_port, ssh_opts)
     vm = VaultManager()
+    secret_payload = _resolve_secret_payload(secret_type, arg1, arg2, key_path, ssh_port, ssh_opts)
     try:
-        vm.save_secret(vault_name, label, payload, secret_type, fernet)
-        click.echo(f"✅ Secret saved to vault '{vault_name}'.")
-    except (ValueError, PermissionError, RuntimeError) as e:
+        vm.save_secret(vault_name, label, secret_payload, secret_type, fernet)
+        logger.info(f"Secret '{label}' ({secret_type}) saved to vault '{vault_name}'.")
+        click.echo(f"✅ Saved '{label}' to vault '{vault_name}'.")
+    except (PermissionError, ValueError, RuntimeError) as e:
         click.echo(f"❌ {e}")
 
 
-@click.command()
+@click.command("add")
 @click.option(
     "--type",
     "-t",
     "secret_type",
     type=click.Choice(["token", "password", "ssh"]),
-    help="Type of secret to store (token, password, ssh).",
+    default=None,
+    help="Explicitly set secret type.",
 )
-@click.option("--key", "-k", "key_path", help="Path to SSH private key file.")
-@click.option("--port", "-p", "ssh_port", help="SSH port (default: 22).")
-@click.option("--opts", "-o", "ssh_opts", help="Additional SSH options.")
+@click.option("--key-path", "-k", default="", help="Path to SSH private key file (SSH only).")
+@click.option("--ssh-port", "-p", default="", help="Custom SSH port (SSH only).")
+@click.option("--ssh-opts", "-o", default="", help="Extra SSH options (SSH only).")
 @click.option(
     "--vault",
     "-v",
@@ -250,7 +281,7 @@ def add(ctx, secret_type, key_path, ssh_port, ssh_opts, vault_name, label, arg1,
         return
 
     if secret_type == "token":  # nosec B105
-        _save_token_secret(store, label, arg1)
+        _save_token_secret(store, label, arg1, arg2)
         return
     if secret_type == "password":  # nosec B105
         _save_password_secret(store, label, arg1, arg2)

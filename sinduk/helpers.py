@@ -137,7 +137,7 @@ def parse_secret_payload(raw: str, secret_type: str = "password") -> dict:  # no
             if isinstance(data, dict):
                 return data
         except (ValueError, TypeError):
-            pass  # nosec B110
+            pass
 
     if secret_type == "password":
         return _parse_legacy_password(raw_str)
@@ -177,5 +177,18 @@ def serialize_ssh_secret(
             "key_path": key_path.strip() if key_path else "",
             "opts": opts.strip() if opts else "",
             "password": password if password else "",
+        }
+    )
+
+
+def serialize_token_secret(token: str, token_id: str = "") -> str:  # nosec B107
+    """Serialize token credentials into a string or structured JSON string."""
+    if not token_id:
+        return token.strip()
+    return json.dumps(
+        {
+            "token_id": token_id.strip(),
+            "token_secret": token.strip(),
+            "token": token.strip(),
         }
     )

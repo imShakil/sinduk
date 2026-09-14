@@ -4,6 +4,7 @@ from sinduk.helpers import (
     parse_secret_payload,
     serialize_password_secret,
     serialize_ssh_secret,
+    serialize_token_secret,
 )
 
 
@@ -82,14 +83,24 @@ def test_parse_ssh_legacy_formats():
     assert parsed2["password"] == "secretpass"
 
 
-def test_parse_token_secret():
-    token_str = "ghp_1234567890abcdef"
-    parsed1 = parse_secret_payload(token_str, "token")
-    assert parsed1["token"] == token_str
+def test_parse_and_serialize_token_secret():
+    # Single token serialization
+    tok_simple = serialize_token_secret("ghp_1234567890abcdef")
+    assert tok_simple == "ghp_1234567890abcdef"
+    parsed1 = parse_secret_payload(tok_simple, "token")
+    assert parsed1["token"] == "ghp_1234567890abcdef"
 
-    token_json = json.dumps({"token": "jwt.header.payload.signature"})
-    parsed2 = parse_secret_payload(token_json, "token")
-    assert parsed2["token"] == "jwt.header.payload.signature"
+    # Token ID + Secret Pair serialization
+    tok_pair = serialize_token_secret("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", token_id="AKIAIOSFODNN7EXAMPLE")
+    parsed_pair = parse_secret_payload(tok_pair, "token")
+    assert parsed_pair["token_id"] == "AKIAIOSFODNN7EXAMPLE"
+    assert parsed_pair["token"] == "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+    # Direct JSON dictionary with custom client_id
+    token_json = json.dumps({"client_id": "oauth_client_1", "client_secret": "oauth_secret_2"})
+    parsed3 = parse_secret_payload(token_json, "token")
+    assert parsed3["client_id"] == "oauth_client_1"
+    assert parsed3["client_secret"] == "oauth_secret_2"
 
 
 def test_web_api_generate_password(monkeypatch):

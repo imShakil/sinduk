@@ -294,7 +294,8 @@ async function quickCopy(id) {
     const { pass } = parsePasswordSecret(text);
     text = pass || text;
   } else {
-    text = parseTokenSecret(text);
+    const { token } = parseTokenSecret(text);
+    text = token || text;
   }
 
   try {
@@ -486,17 +487,18 @@ function parseSSHSecret(existingValue) {
 }
 
 function parseTokenSecret(existingValue) {
-  if (!existingValue) return '';
+  if (!existingValue) return { tokenId: '', token: '' };
   if (typeof existingValue === 'string' && existingValue.trim().startsWith('{') && existingValue.trim().endsWith('}')) {
     try {
       const obj = JSON.parse(existingValue);
       if (typeof obj === 'object' && obj !== null) {
-        if (obj.token !== undefined) return String(obj.token);
-        if (obj.secret !== undefined) return String(obj.secret);
+        const tokenId = obj.token_id || obj.client_id || obj.key_id || obj.id || '';
+        const token = obj.token || obj.token_secret || obj.secret || obj.client_secret || '';
+        return { tokenId: String(tokenId), token: String(token) };
       }
     } catch { }
   }
-  return existingValue;
+  return { tokenId: '', token: String(existingValue) };
 }
 
 function bindSSHPreviewListeners() {
@@ -543,13 +545,20 @@ function renderPasswordTypeForm(container, existingValue) {
 }
 
 function renderTokenTypeForm(container, existingValue) {
-  const val = parseTokenSecret(existingValue);
+  const { tokenId, token } = parseTokenSecret(existingValue);
   container.innerHTML = `
+      <div class="field">
+        <label for="edit-token-id">Key ID / Client ID <span class="optional-tag">optional — for AWS, OAuth, API key pairs</span></label>
+        <div class="input-with-icon-wrap">
+          <span class="field-leading-icon">🏷️</span>
+          <input type="text" id="edit-token-id" placeholder="e.g. AKIAIOSFODNN7EXAMPLE, client_id, rzp_live_..." value="${esc(tokenId)}" autocomplete="off" />
+        </div>
+      </div>
       <div class="field">
         <label for="edit-token">Token / API Key / Secret Text <span class="required-tag">*</span></label>
         <div class="pw-input-wrap">
           <textarea id="edit-token" rows="4" placeholder="Paste your token, API key, JWT, or private secret here"
-            oninput="updateStrength(this.value)">${esc(val)}</textarea>
+            oninput="updateStrength(this.value)">${esc(token)}</textarea>
           <button type="button" class="pw-toggle textarea-toggle" onclick="toggleTokenVisibility()">👁</button>
         </div>
         <div id="strength-bar-wrap" class="strength-wrap">
@@ -558,7 +567,7 @@ function renderTokenTypeForm(container, existingValue) {
         <div id="strength-label" class="strength-label"></div>
       </div>
     `;
-  if (val) updateStrength(val);
+  if (token) updateStrength(token);
 }
 
 function renderSSHTypeForm(container, existingValue) {
@@ -706,8 +715,13 @@ function collectSecretValue(type) {
     if (!pass) return null;
     return JSON.stringify({ username: user, password: pass, domain });
   } else if (type === 'token') {
+    const tokenId = document.getElementById('edit-token-id')?.value.trim() || '';
     const token = document.getElementById('edit-token')?.value || '';
-    return token.trim() ? token : null;
+    if (!token.trim()) return null;
+    if (tokenId) {
+      return JSON.stringify({ token_id: tokenId, token: token.trim(), token_secret: token.trim() });
+    }
+    return token.trim();
   } else if (type === 'ssh') {
     const user = document.getElementById('ssh-edit-user')?.value.trim() || '';
     const host = document.getElementById('ssh-edit-host')?.value.trim() || '';
@@ -821,24 +835,36 @@ function formatPasswordDisplay(text, { domainBtn, userBtn } = {}) {
   return html;
 }
 
-function formatTokenDisplay(text) {
-  const val = parseTokenSecret(text);
-  return `<pre class="reveal-token-pre"><code>${esc(val)}</code></pre>`;
+function formatTokenDisplay(text, buttons = {}) {
+  const { tokenId, token } = parseTokenSecret(text);
+  if (buttons.tokenIdBtn) {
+    buttons.tokenIdBtn.style.display = tokenId ? 'inline-flex' : 'none';
+  }
+  if (!tokenId) {
+    return `<pre class="reveal-token-pre"><code>${esc(token)}</code></pre>`;
+  }
+  return `
+    <div class="reveal-structured-row"><span class="reveal-field-label">🏷️ Key ID:</span><span>${esc(tokenId)}</span></div>
+    <div class="reveal-structured-row"><span class="reveal-field-label">🪙 Secret:</span><span class="reveal-pw-val">${esc(token)}</span></div>
+  `;
 }
 
 function setRevealVisible(text, type) {
   const el = document.getElementById('reveal-text');
   const domainBtn = document.getElementById('copy-domain-btn');
   const userBtn = document.getElementById('copy-username-btn');
+  const tokenIdBtn = document.getElementById('copy-token-id-btn');
 
   if (type === 'ssh') {
     el.innerHTML = formatSSHDisplay(text);
     if (userBtn) userBtn.style.display = 'none';
     if (domainBtn) domainBtn.style.display = 'none';
+    if (tokenIdBtn) tokenIdBtn.style.display = 'none';
   } else if (type === 'password') {
     el.innerHTML = formatPasswordDisplay(text, { domainBtn, userBtn });
+    if (tokenIdBtn) tokenIdBtn.style.display = 'none';
   } else {
-    el.innerHTML = formatTokenDisplay(text);
+    el.innerHTML = formatTokenDisplay(text, { tokenIdBtn });
     if (userBtn) userBtn.style.display = 'none';
     if (domainBtn) domainBtn.style.display = 'none';
   }
@@ -906,7 +932,8 @@ async function copySecret() {
     const { pass } = parsePasswordSecret(text);
     copyText = pass || text;
   } else {
-    copyText = parseTokenSecret(text);
+    const { token } = parseTokenSecret(text);
+    copyText = token || text;
   }
 
   try {
@@ -957,6 +984,21 @@ async function copyDomain() {
   try {
     await navigator.clipboard.writeText(domain);
     showMsg('view-msg', 'success', '🌐 Domain copied!');
+    setTimeout(() => hide('view-msg'), 2500);
+  } catch { }
+}
+
+// Copy Key ID / Client ID specifically (for token type with ID)
+async function copyTokenId() {
+  const text = await fetchSecret();
+  if (text === null) return;
+  const s = S.secrets.find(x => x.id === S.currentId);
+  if (s?.type !== 'token') return;
+  const { tokenId } = parseTokenSecret(text);
+  if (!tokenId) return;
+  try {
+    await navigator.clipboard.writeText(tokenId);
+    showMsg('view-msg', 'success', '🏷️ Key ID copied!');
     setTimeout(() => hide('view-msg'), 2500);
   } catch { }
 }
