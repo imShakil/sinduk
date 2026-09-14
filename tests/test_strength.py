@@ -1,7 +1,7 @@
 """Tests for pacli.strength module."""
 
 import pytest
-from pacli.strength import (
+from sinduk.strength import (
     StrengthLabel,
     StrengthResult,
     evaluate,

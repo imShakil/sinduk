@@ -1,5 +1,5 @@
 def test_choice_one_retries_until_valid(monkeypatch):
-    from pacli import helpers
+    from sinduk import helpers
 
     prompts = iter([0, 2])
     monkeypatch.setattr(helpers.click, "prompt", lambda *args, **kwargs: next(prompts))
@@ -16,7 +16,7 @@ def test_choice_one_retries_until_valid(monkeypatch):
 
 
 def test_copy_to_clipboard_success(monkeypatch):
-    from pacli import helpers
+    from sinduk import helpers
 
     captured = {"value": None}
 
@@ -30,7 +30,7 @@ def test_copy_to_clipboard_success(monkeypatch):
 
 
 def test_copy_to_clipboard_failure(monkeypatch, capsys):
-    from pacli import helpers
+    from sinduk import helpers
 
     def _raise_runtime(value):
         raise RuntimeError("boom")
@@ -43,7 +43,7 @@ def test_copy_to_clipboard_failure(monkeypatch, capsys):
 
 
 def test_master_password_required_allows_and_blocks(monkeypatch):
-    import pacli.decorators as decorators
+    import sinduk.decorators as decorators
 
     class StoreNotSet:
         def is_master_set(self):
@@ -77,8 +77,8 @@ def test_master_password_required_allows_and_blocks(monkeypatch):
 
 
 def test_linkly_shorten_success(monkeypatch):
-    from pacli.linklyhq import LinklyHQ
-    import pacli.linklyhq as linkly
+    from sinduk.linklyhq import LinklyHQ
+    import sinduk.linklyhq as linkly
 
     class FakeResponse:
         def raise_for_status(self):
@@ -94,8 +94,8 @@ def test_linkly_shorten_success(monkeypatch):
 
 
 def test_linkly_shorten_request_error(monkeypatch):
-    from pacli.linklyhq import LinklyHQ
-    import pacli.linklyhq as linkly
+    from sinduk.linklyhq import LinklyHQ
+    import sinduk.linklyhq as linkly
 
     def raise_request_error(*args, **kwargs):
         raise linkly.requests.exceptions.RequestException("network")
@@ -107,7 +107,7 @@ def test_linkly_shorten_request_error(monkeypatch):
 
 
 def test_parse_and_suggest_ssh_hosts(monkeypatch, tmp_path):
-    from pacli import ssh_utils
+    from sinduk import ssh_utils
 
     ssh_dir = tmp_path / ".ssh"
     ssh_dir.mkdir(parents=True)
@@ -138,14 +138,14 @@ Host test-box
 
 
 def test_get_ssh_connection_string():
-    from pacli import ssh_utils
+    from sinduk import ssh_utils
 
     assert ssh_utils.get_ssh_connection_string({"hostname": "1.1.1.1", "user": "root", "port": "22"}) == "root@1.1.1.1"
     assert ssh_utils.get_ssh_connection_string({"hostname": "", "user": "root"}) is None
 
 
 def test_cli_registers_expected_commands():
-    from pacli.cli import cli
+    from sinduk.cli import cli
 
     expected = {
         "init",
@@ -171,27 +171,39 @@ def test_cli_registers_expected_commands():
 
 
 def test_package_version_symbol_exists():
-    import pacli
+    import sinduk
 
-    assert hasattr(pacli, "__version__")
-    assert isinstance(pacli.__version__, str)
+    assert hasattr(sinduk, "__version__")
+    assert isinstance(sinduk.__version__, str)
 
 
 def test_get_logger_returns_named_logger(monkeypatch, tmp_path):
-    import pacli.log as log_module
+    import sinduk.log as log_module
 
-    monkeypatch.setattr(log_module.os.path, "expanduser", lambda p: str(tmp_path / "pacli.log"))
+    monkeypatch.setattr(log_module.os.path, "expanduser", lambda p: str(tmp_path / "sinduk.log"))
     logger = log_module.get_logger("demo.logger")
 
     assert logger.name == "demo.logger"
 
 
 def test_get_logger_permission_error(monkeypatch, tmp_path):
-    import pacli.log as log_module
+    import sinduk.log as log_module
     import pytest
 
-    monkeypatch.setattr(log_module.os.path, "expanduser", lambda p: str(tmp_path / "pacli.log"))
+    monkeypatch.setattr(log_module.os.path, "expanduser", lambda p: str(tmp_path / "sinduk.log"))
     monkeypatch.setattr(log_module.os, "access", lambda *args, **kwargs: False)
 
     with pytest.raises(PermissionError):
         log_module.get_logger("blocked.logger")
+
+
+def test_cli_pacli_alias_deprecation_warning(monkeypatch):
+    import sys
+    from click.testing import CliRunner
+    from sinduk.cli import cli
+
+    runner = CliRunner()
+    monkeypatch.setattr(sys, "argv", ["pacli", "--help"])
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "deprecated" in result.output.lower() or "sinduk" in result.output.lower()

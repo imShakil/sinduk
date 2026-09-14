@@ -60,7 +60,7 @@ def _make_store(configured=True, valid_password="secret123"):
 
 
 def _build_app_with_basic_routes(store):
-    import pacli.web.app as web_app
+    import sinduk.web.app as web_app
 
     app = Flask(__name__)
     app.secret_key = "test"
@@ -84,7 +84,7 @@ def _build_app_with_basic_routes(store):
 
 
 def test_is_same_origin():
-    import pacli.web.app as web_app
+    import sinduk.web.app as web_app
 
     assert web_app._is_same_origin("http://localhost:5000/x", "http://localhost:5000/") is True
     assert web_app._is_same_origin("https://localhost:5000/x", "http://localhost:5000/") is False
@@ -92,7 +92,7 @@ def test_is_same_origin():
 
 
 def test_extract_and_resolve_ssh_helpers(tmp_path):
-    import pacli.web.app as web_app
+    import sinduk.web.app as web_app
 
     data = {"hostname": "h", "username": "u", "port": "2200", "password": "p", "key_id": "k", "ssh_key": "pem"}
     hostname, username, port, password, key_id, ssh_key = web_app._extract_ssh_params(data)
@@ -121,7 +121,7 @@ def test_extract_and_resolve_ssh_helpers(tmp_path):
 
 
 def test_serialize_secret_row():
-    import pacli.web.app as web_app
+    import sinduk.web.app as web_app
 
     row = ("id1", "label", "token", 1710000000, 1710000010)
     out = web_app._serialize_secret_row(row)
@@ -134,7 +134,7 @@ def test_csrf_same_origin_blocks_cross_site():
     app = Flask(__name__)
     app.secret_key = "test"
 
-    import pacli.web.app as web_app
+    import sinduk.web.app as web_app
 
     web_app._register_csrf_same_origin_protection(app)
 
@@ -247,7 +247,7 @@ def test_auth_and_secret_routes_happy_path_and_errors():
     assert r.status_code == 200
 
     data = {"password": "ok", "overwrite": "false"}
-    upload = {"file": (io.BytesIO(b"blob"), "x.pacli")}
+    upload = {"file": (io.BytesIO(b"blob"), "x.sinduk")}
     r = client.post(
         "/api/backup/import",
         data={**data, **upload},
@@ -276,7 +276,7 @@ def test_unauthorized_and_session_expired_branches():
 
 
 def test_start_output_streaming_emits_disconnect(monkeypatch):
-    import pacli.web.app as web_app
+    import sinduk.web.app as web_app
 
     emitted = []
 

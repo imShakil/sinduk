@@ -1,5 +1,5 @@
 def test_ssh_helper_extract_and_build_command(monkeypatch):
-    from pacli.commands import ssh as ssh_cmd
+    from sinduk.commands import ssh as ssh_cmd
 
     selected = {"secret": "ubuntu:10.0.0.1|port:2200|key:/tmp/id_rsa|opts:-o StrictHostKeyChecking=no"}
     cmd_parts, user, ip = ssh_cmd._build_ssh_command(selected)
@@ -12,7 +12,7 @@ def test_ssh_helper_extract_and_build_command(monkeypatch):
 
 
 def test_ssh_helpers_invalid_cases(capsys):
-    from pacli.commands import ssh as ssh_cmd
+    from sinduk.commands import ssh as ssh_cmd
 
     user, ip, parts = ssh_cmd._extract_user_host("invalid-format")
     assert (user, ip, parts) == (None, None, None)
@@ -25,7 +25,7 @@ def test_ssh_helpers_invalid_cases(capsys):
 
 
 def test_ssh_option_handlers():
-    from pacli.commands import ssh as ssh_cmd
+    from sinduk.commands import ssh as ssh_cmd
 
     cmd = ["ssh"]
     assert ssh_cmd._handle_port_option(cmd, "port:22") is True
@@ -38,7 +38,7 @@ def test_ssh_option_handlers():
 
 
 def test_secrets_helper_type_and_ssh_formatting(monkeypatch):
-    from pacli.commands import secrets
+    from sinduk.commands import secrets
 
     assert secrets._detect_secret_type(None, None, None) == "token"
     assert secrets._detect_secret_type(None, "user", "pass") == "password"
@@ -57,7 +57,7 @@ def test_secrets_helper_type_and_ssh_formatting(monkeypatch):
 
 
 def test_secrets_prompt_updated_ssh_secret(monkeypatch):
-    from pacli.commands import secrets
+    from sinduk.commands import secrets
 
     prompts = iter(["ubuntu", "10.0.0.1", "key:/tmp/id_rsa"])
     monkeypatch.setattr(secrets.click, "prompt", lambda *args, **kwargs: next(prompts))
@@ -67,7 +67,7 @@ def test_secrets_prompt_updated_ssh_secret(monkeypatch):
 
 
 def test_secrets_copy_and_print_paths(monkeypatch, capsys):
-    from pacli.commands import secrets
+    from sinduk.commands import secrets
 
     copied = {"value": None}
     monkeypatch.setattr(secrets, "copy_to_clipboard", lambda s: copied.__setitem__("value", s))

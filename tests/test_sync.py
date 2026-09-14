@@ -7,25 +7,25 @@ import pytest
 from click.testing import CliRunner
 from cryptography.fernet import Fernet
 
-from pacli.cli import cli
-from pacli.vault import VaultManager, set_user_identity
+from sinduk.cli import cli
+from sinduk.vault import VaultManager, set_user_identity
 
 
 @pytest.fixture(autouse=True)
 def isolated_pacli_dir(tmp_path, monkeypatch):
     """Redirect all pacli config to a temp directory for test isolation."""
-    test_config = str(tmp_path / "pacli_config")
+    test_config = str(tmp_path / "sinduk_config")
     os.makedirs(test_config, exist_ok=True)
 
-    monkeypatch.setattr("pacli.vault.PACLI_DIR", test_config)
-    monkeypatch.setattr("pacli.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
-    monkeypatch.setattr("pacli.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
-    monkeypatch.setattr("pacli.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
+    monkeypatch.setattr("sinduk.vault.PACLI_DIR", test_config)
+    monkeypatch.setattr("sinduk.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
+    monkeypatch.setattr("sinduk.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
+    monkeypatch.setattr("sinduk.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
 
     store_salt_path = os.path.join(test_config, "salt.bin")
     store_hash_path = os.path.join(test_config, "password_hash.bin")
-    monkeypatch.setattr("pacli.store.SALT_PATH", store_salt_path)
-    monkeypatch.setattr("pacli.store.PASSWORD_HASH_PATH", store_hash_path)
+    monkeypatch.setattr("sinduk.store.SALT_PATH", store_salt_path)
+    monkeypatch.setattr("sinduk.store.PASSWORD_HASH_PATH", store_hash_path)
 
     yield test_config
 
@@ -85,9 +85,9 @@ class TestSyncCliCommands:
         vm.save_secret("team-dev", "staging-db", "root:secret", "password", master_fernet)
 
         # Monkeypatch store master password requirement
-        monkeypatch.setattr("pacli.store.SecretStore.is_master_set", lambda self: True)
+        monkeypatch.setattr("sinduk.store.SecretStore.is_master_set", lambda self: True)
         monkeypatch.setattr(
-            "pacli.store.SecretStore.require_fernet",
+            "sinduk.store.SecretStore.require_fernet",
             lambda self, *args, **kwargs: setattr(self, "fernet", master_fernet),
         )
 
@@ -97,7 +97,7 @@ class TestSyncCliCommands:
         push_res = runner.invoke(cli, ["sync", "push", "team-dev", "--to", shared_dir, "--password", "testpassword"])
         assert push_res.exit_code == 0
         assert "Pushed vault 'team-dev'" in push_res.output
-        assert os.path.exists(os.path.join(shared_dir, "team-dev.pacli"))
+        assert os.path.exists(os.path.join(shared_dir, "team-dev.sinduk"))
 
         # Test Status
         status_res = runner.invoke(cli, ["sync", "status", "team-dev", "--path", shared_dir])
@@ -119,9 +119,9 @@ class TestSyncCliCommands:
     def test_sync_pull_file_not_found(
         self, runner, isolated_pacli_dir, master_fernet, user_identity, tmp_path, monkeypatch
     ):
-        monkeypatch.setattr("pacli.store.SecretStore.is_master_set", lambda self: True)
+        monkeypatch.setattr("sinduk.store.SecretStore.is_master_set", lambda self: True)
         monkeypatch.setattr(
-            "pacli.store.SecretStore.require_fernet",
+            "sinduk.store.SecretStore.require_fernet",
             lambda self, *args, **kwargs: setattr(self, "fernet", master_fernet),
         )
 

@@ -2,7 +2,7 @@ import os
 
 
 def _configure_store_paths(monkeypatch, tmp_path):
-    import pacli.store as store
+    import sinduk.store as store
 
     monkeypatch.setattr(store, "SALT_PATH", str(tmp_path / "salt.bin"))
     monkeypatch.setattr(store, "PASSWORD_HASH_PATH", str(tmp_path / "password_hash.bin"))
@@ -258,14 +258,40 @@ def test_import_backup_counts_record_errors(monkeypatch, tmp_path):
 
     import json
 
-    salt = store_module.get_salt()
+    if blob.startswith(store_module.BUNDLE_MAGIC):
+        salt = blob[len(store_module.BUNDLE_MAGIC) : len(store_module.BUNDLE_MAGIC) + store_module.BUNDLE_SALT_SIZE]
+        raw_blob = blob[len(store_module.BUNDLE_MAGIC) + store_module.BUNDLE_SALT_SIZE :]
+    else:
+        salt = store_module.get_salt()
+        raw_blob = blob
     backup_fernet = source._derive_fernet("backup-pass", salt)
-    records = json.loads(backup_fernet.decrypt(blob).decode())
+    records = json.loads(backup_fernet.decrypt(raw_blob).decode())
     records.append({"id": "broken-id", "label": "x", "type": "token", "creation_time": 1, "update_time": 1})
-    tampered_blob = backup_fernet.encrypt(json.dumps(records).encode())
+    enc = backup_fernet.encrypt(json.dumps(records).encode())
+    tampered_blob = store_module.BUNDLE_MAGIC + salt + enc if blob.startswith(store_module.BUNDLE_MAGIC) else enc
 
     target = _build_store(store_module, tmp_path / "dst_err", password="master2")
     stats = target.import_encrypted_backup(tampered_blob, "backup-pass", merge=True)
 
     assert stats["imported"] == 1
     assert stats["errors"] == 1
+
+
+def test_legacy_config_auto_migration(tmp_path):
+    import sinduk.store as store
+
+    legacy_dir = tmp_path / "legacy_pacli"
+    sinduk_dir = tmp_path / "new_sinduk"
+
+    os.makedirs(legacy_dir, exist_ok=True)
+    with open(legacy_dir / "salt.bin", "wb") as f:
+        f.write(b"legacy_salt_1234")
+    with open(legacy_dir / "sqlite3.db", "w") as f:
+        f.write("mock_db_content")
+
+    store.migrate_legacy_config(src=str(legacy_dir), dst=str(sinduk_dir))
+
+    assert os.path.exists(sinduk_dir)
+    assert os.path.exists(sinduk_dir / "salt.bin")
+    assert (sinduk_dir / "salt.bin").read_bytes() == b"legacy_salt_1234"
+    assert os.path.exists(sinduk_dir / "sqlite3.db")

@@ -1,0 +1,2283 @@
+/* ============================================================
+   Sinduk — Modern Slate + Emerald Theme
+   Effects: gradient buttons · focus glow · noise texture
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    /* ── Core palette ── */
+    --bg: #0b0f0e;
+    /* deep near-black with a green tinge */
+    --surface: #111917;
+    /* card / sidebar surface */
+    --surface2: #18211e;
+    /* elevated surface */
+    --border: rgba(52, 211, 153, 0.08);
+    --border2: rgba(52, 211, 153, 0.14);
+
+    /* ── Accent — emerald ── */
+    --accent: #34d399;
+    --accent-dim: #10b981;
+    --accent-glow: rgba(52, 211, 153, 0.22);
+    --accent-subtle: rgba(52, 211, 153, 0.08);
+
+    /* ── Semantic colours ── */
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+
+    /* ── Text ── */
+    --text: #e2f0eb;
+    --muted: #5a7a6e;
+    --muted2: #8aab9c;
+
+    /* ── Misc ── */
+    --radius: 10px;
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+    --font-ui: 'Syne', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --terminal-bg: #060a09;
+    --terminal-toolbar-bg: #0a0f0e;
+
+    /* ── Noise texture (SVG data URI) ── */
+    --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+:root[data-theme='light'] {
+    --bg: #f4f8f6;
+    --surface: #ffffff;
+    --surface2: #edf5f1;
+    --border: rgba(6, 95, 70, 0.12);
+    --border2: rgba(6, 95, 70, 0.2);
+
+    --accent: #047857;
+    --accent-dim: #065f46;
+    --accent-glow: rgba(4, 120, 87, 0.22);
+    --accent-subtle: rgba(4, 120, 87, 0.08);
+
+    --green: #047857;
+    --red: #dc2626;
+    --yellow: #b45309;
+
+    --text: #0f172a;
+    --muted: #5f6f67;
+    --muted2: #34423b;
+
+    --shadow: 0 12px 34px rgba(0, 0, 0, 0.12);
+    --terminal-bg: #f7faf8;
+    --terminal-toolbar-bg: #eef4f1;
+    --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+html,
+body {
+    height: 100%;
+}
+
+body {
+    font-family: var(--font-ui);
+    background-color: var(--bg);
+    background-image: var(--noise);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color .2s ease, color .2s ease;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ============================================================
+   Form elements
+   ============================================================ */
+input,
+textarea,
+select {
+    font-family: var(--font-ui);
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: .65rem 1rem;
+    width: 100%;
+    font-size: .925rem;
+    transition: border-color .2s, box-shadow .2s;
+    outline: none;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--accent);
+    box-shadow:
+        0 0 0 3px var(--accent-glow),
+        0 0 12px var(--accent-glow);
+}
+
+select option {
+    background: var(--surface2);
+}
+
+textarea {
+    resize: vertical;
+    font-family: var(--font-mono);
+    font-size: .85rem;
+}
+
+textarea.token-hidden {
+    -webkit-text-security: disc;
+    font-family: var(--font-ui);
+    letter-spacing: .1em;
+}
+
+label {
+    display: block;
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--muted2);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: .4rem;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    margin-bottom: 1.1rem;
+}
+
+.required-tag {
+    color: var(--red);
+    font-size: .7rem;
+}
+
+.optional-tag {
+    color: var(--muted);
+    font-size: .68rem;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn {
+    font-family: var(--font-ui);
+    font-size: .9rem;
+    font-weight: 700;
+    padding: .65rem 1.4rem;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all .18s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    letter-spacing: .02em;
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn:active {
+    transform: scale(.97);
+}
+
+/* Primary — gradient emerald */
+.btn-primary {
+    background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+    color: #021a10;
+    font-weight: 800;
+    box-shadow: 0 2px 14px rgba(52, 211, 153, 0.28);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #6ee7b7 0%, #34d399 100%);
+    box-shadow: 0 4px 22px rgba(52, 211, 153, 0.42);
+    transform: translateY(-1px);
+}
+
+.btn-primary:active {
+    transform: scale(.97) translateY(0);
+}
+
+/* Ghost */
+.btn-ghost {
+    background: var(--surface2);
+    color: var(--muted2);
+    border: 1px solid var(--border2);
+}
+
+.btn-ghost:hover {
+    background: rgba(52, 211, 153, 0.08);
+    border-color: rgba(52, 211, 153, 0.25);
+    color: var(--text);
+}
+
+/* Danger */
+.btn-danger {
+    background: rgba(248, 113, 113, .12);
+    color: var(--red);
+    border: 1px solid rgba(248, 113, 113, .28);
+}
+
+.btn-danger:hover {
+    background: rgba(248, 113, 113, .22);
+}
+
+.btn-sm {
+    padding: .4rem .85rem;
+    font-size: .8rem;
+}
+
+/* ============================================================
+   Theme Pill Toggle
+   Light mode : white track · thumb LEFT  · sun on thumb · moon on right
+   Dark  mode : dark track  · thumb RIGHT · moon on thumb · sun on left
+   Thumb fills almost the full track height, accent-colored circle
+   ============================================================ */
+.theme-toggle-pill {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    transition: transform .15s;
+}
+
+.theme-toggle-pill:active {
+    transform: scale(.94);
+}
+
+/* ── Track ── */
+.theme-pill-track {
+    position: relative;
+    width: 80px;
+    height: 42px;
+    border-radius: 999px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border2);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .04);
+    transition: background .3s ease, border-color .3s ease;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+:root[data-theme='light'] .theme-pill-track {
+    background: #f0f0f0;
+    border-color: rgba(0, 0, 0, .1);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .15), inset 0 1px 2px rgba(0, 0, 0, .06);
+}
+
+/* ── Thumb — large circle, 4px gap all around ── */
+.theme-pill-thumb {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* dark mode: thumb on RIGHT */
+    transform: translateX(38px);
+    transition: transform .35s cubic-bezier(.34, 1.5, .64, 1);
+    box-shadow: 0 3px 12px var(--accent-glow);
+    z-index: 2;
+    will-change: transform;
+}
+
+:root[data-theme='light'] .theme-pill-thumb {
+    /* light mode: thumb on LEFT */
+    transform: translateX(0px);
+    background: var(--accent);
+    box-shadow: 0 3px 12px var(--accent-glow);
+}
+
+/* ── Icon inside thumb ── */
+.pill-icon {
+    width: 16px;
+    height: 16px;
+    color: #fff;
+    flex-shrink: 0;
+    stroke-width: 2;
+}
+
+/* dark mode: moon on thumb */
+.pill-icon-sun {
+    display: none;
+}
+
+.pill-icon-moon {
+    display: block;
+}
+
+/* light mode: sun on thumb */
+:root[data-theme='light'] .pill-icon-sun {
+    display: block;
+}
+
+:root[data-theme='light'] .pill-icon-moon {
+    display: none;
+}
+
+/* ── Background icon on opposite side of thumb ── */
+.pill-track-icon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 17px;
+    height: 17px;
+    pointer-events: none;
+    z-index: 1;
+    stroke-width: 2;
+}
+
+/* dark mode: faint sun on LEFT */
+.pill-track-sun {
+    display: block;
+    left: 12px;
+    color: var(--muted);
+    opacity: .5;
+}
+
+.pill-track-moon {
+    display: none;
+}
+
+/* light mode: faint moon on RIGHT */
+:root[data-theme='light'] .pill-track-sun {
+    display: none;
+}
+
+:root[data-theme='light'] .pill-track-moon {
+    display: block;
+    right: 12px;
+    color: var(--muted);
+    opacity: .45;
+}
+
+.btn-block {
+    width: 100%;
+}
+
+/* ============================================================
+   Alerts
+   ============================================================ */
+.alert {
+    font-size: .875rem;
+    padding: .7rem 1rem;
+    border-radius: var(--radius);
+    margin-top: .6rem;
+    border: 1px solid transparent;
+}
+
+.alert-error {
+    background: rgba(248, 113, 113, .1);
+    border-color: rgba(248, 113, 113, .3);
+    color: var(--red);
+}
+
+.alert-success {
+    background: rgba(52, 211, 153, .1);
+    border-color: rgba(52, 211, 153, .3);
+    color: var(--green);
+}
+
+.alert-info {
+    background: rgba(52, 211, 153, .07);
+    border-color: rgba(52, 211, 153, .2);
+    color: var(--muted2);
+}
+
+/* ============================================================
+   Badges
+   ============================================================ */
+.badge {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: .2rem .6rem;
+    border-radius: 20px;
+    letter-spacing: .05em;
+}
+
+.badge-password {
+    background: rgba(52, 211, 153, .12);
+    color: var(--accent);
+}
+
+.badge-token {
+    background: rgba(251, 191, 36, .12);
+    color: var(--yellow);
+}
+
+.badge-ssh {
+    background: rgba(52, 211, 153, .08);
+    color: var(--accent-dim);
+}
+
+/* ============================================================
+   KBD
+   ============================================================ */
+.kbd {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: .1rem .35rem;
+    color: var(--muted);
+}
+
+/* ============================================================
+   Overlay / Auth
+   ============================================================ */
+.overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    background-image: var(--noise);
+    z-index: 100;
+}
+
+/* Radial glow behind the auth card */
+.overlay::before {
+    content: '';
+    position: absolute;
+    width: 480px;
+    height: 480px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(52, 211, 153, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 18px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow), 0 0 40px rgba(52, 211, 153, 0.06);
+    position: relative;
+    z-index: 1;
+}
+
+.auth-logo {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.auth-logo .icon {
+    font-size: 2.5rem;
+}
+
+.auth-logo h1 {
+    font-size: 1.7rem;
+    font-weight: 800;
+    margin-top: .4rem;
+    letter-spacing: -.02em;
+}
+
+.auth-logo p {
+    color: var(--muted);
+    font-size: .9rem;
+    margin-top: .25rem;
+}
+
+.auth-actions {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    margin-top: 1.25rem;
+}
+
+/* ============================================================
+   App shell
+   ============================================================ */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .85rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 1rem;
+    background-image: var(--noise);
+}
+
+.topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: -.01em;
+}
+
+.topbar-brand span {
+    font-size: 1.3rem;
+}
+
+.topbar-actions {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.topbar-count {
+    font-size: .8rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+
+.body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ============================================================
+   Sidebar
+   ============================================================ */
+.sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--surface);
+    background-image: var(--noise);
+    border-right: 1px solid var(--border);
+    padding: 1.2rem .9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto;
+}
+
+.sidebar-section-title {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+    margin-bottom: .5rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+.filter-list {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .45rem .75rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: .875rem;
+    font-weight: 600;
+    color: var(--muted2);
+    transition: all .15s;
+    border: 1px solid transparent;
+    background: none;
+    text-align: left;
+    width: 100%;
+    font-family: var(--font-ui);
+}
+
+.filter-item:hover {
+    background: var(--accent-subtle);
+    color: var(--text);
+}
+
+.filter-item.active {
+    background: rgba(52, 211, 153, .1);
+    color: var(--accent);
+    border-color: rgba(52, 211, 153, .2);
+}
+
+.filter-count {
+    font-size: .73rem;
+    font-family: var(--font-mono);
+    opacity: .7;
+}
+
+.search-wrap {
+    position: relative;
+}
+
+.search-icon {
+    position: absolute;
+    left: .75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+    font-size: .85rem;
+}
+
+.search-wrap input {
+    padding-left: 2.1rem;
+}
+
+.sidebar-shortcuts {
+    margin-top: auto;
+}
+
+.shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+}
+
+.shortcut-item {
+    font-size: .73rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+/* ============================================================
+   Main / Grid
+   ============================================================ */
+.main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.secrets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 1rem;
+}
+
+/* ============================================================
+   Secret cards
+   ============================================================ */
+.secret-card {
+    background: var(--surface);
+    background-image: var(--noise);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.15rem 1rem;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+    overflow: hidden;
+}
+
+/* left accent stripe */
+.secret-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background .2s;
+}
+
+.secret-card:hover {
+    border-color: rgba(52, 211, 153, .22);
+    background: var(--surface2);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .35), 0 0 16px rgba(52, 211, 153, .06);
+}
+
+.secret-card:hover::before {
+    background: var(--accent);
+}
+
+.secret-card:hover .secret-card-actions {
+    opacity: 1;
+}
+
+.secret-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: .5rem;
+}
+
+.secret-card-label {
+    font-size: .95rem;
+    font-weight: 700;
+    word-break: break-all;
+    flex: 1;
+    margin-right: .5rem;
+}
+
+.secret-card-meta {
+    font-size: .73rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    margin-top: .4rem;
+}
+
+.secret-card-actions {
+    display: flex;
+    gap: .3rem;
+    margin-top: .6rem;
+    opacity: 0;
+    transition: opacity .15s;
+}
+
+.card-action-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: .25rem .5rem;
+    cursor: pointer;
+    font-size: .85rem;
+    color: var(--muted2);
+    transition: all .15s;
+}
+
+.card-action-btn:hover {
+    background: rgba(52, 211, 153, .1);
+    border-color: rgba(52, 211, 153, .25);
+    color: var(--accent);
+}
+
+/* ── Empty state ── */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+    grid-column: 1/-1;
+}
+
+.empty-state .es-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    font-size: 1.1rem;
+    margin-bottom: .5rem;
+    color: var(--muted2);
+}
+
+/* ============================================================
+   Modals
+   ============================================================ */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .7);
+    backdrop-filter: blur(6px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.modal {
+    background: var(--surface);
+    background-image: var(--noise);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow), 0 0 40px rgba(52, 211, 153, 0.05);
+    animation: slideUp .22s cubic-bezier(.22, 1, .36, 1);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(18px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-lg {
+    max-width: 680px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 1;
+}
+
+.modal-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.2rem;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all .15s;
+}
+
+.modal-close:hover {
+    background: rgba(248, 113, 113, .12);
+    color: var(--red);
+}
+
+.modal-body {
+    padding: 1.4rem 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: .7rem;
+    justify-content: flex-end;
+    align-items: center;
+    position: sticky;
+    bottom: 0;
+    background: var(--surface);
+}
+
+/* ============================================================
+   Type selector (Add modal)
+   ============================================================ */
+.type-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .6rem;
+    margin-bottom: .25rem;
+}
+
+.type-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .2rem;
+    padding: .85rem .5rem;
+    background: var(--surface2);
+    border: 2px solid var(--border2);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all .18s;
+    font-family: var(--font-ui);
+    text-align: center;
+}
+
+.type-btn:hover {
+    border-color: rgba(52, 211, 153, .35);
+    background: var(--accent-subtle);
+}
+
+.type-btn.active {
+    border-color: var(--accent);
+    background: rgba(52, 211, 153, .1);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.type-icon {
+    font-size: 1.4rem;
+}
+
+.type-name {
+    font-size: .825rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.type-desc {
+    font-size: .68rem;
+    color: var(--muted);
+}
+
+/* ============================================================
+   Password input with toggle
+   ============================================================ */
+.pw-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.pw-input-wrap input,
+.pw-input-wrap textarea {
+    padding-right: 2.6rem;
+}
+
+.pw-toggle {
+    position: absolute;
+    right: .6rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: .9rem;
+    padding: .2rem;
+    transition: color .15s;
+    flex-shrink: 0;
+}
+
+.pw-toggle.textarea-toggle {
+    top: .6rem;
+    bottom: auto;
+}
+
+.pw-toggle:hover {
+    color: var(--accent);
+}
+
+/* ============================================================
+   Password strength
+   ============================================================ */
+.strength-wrap {
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: .3rem;
+}
+
+.strength-bar {
+    height: 100%;
+    width: 0;
+    border-radius: 2px;
+    transition: width .3s, background .3s;
+}
+
+.strength-label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-top: .2rem;
+}
+
+/* ============================================================
+   SSH form
+   ============================================================ */
+.ssh-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+}
+
+.ssh-edit-preview {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .6rem 1rem;
+    margin-bottom: 1rem;
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    word-break: break-all;
+}
+
+.preview-label {
+    color: var(--muted);
+    font-size: .72rem;
+    flex-shrink: 0;
+}
+
+/* ============================================================
+   View modal rows
+   ============================================================ */
+.view-row {
+    display: flex;
+    gap: .75rem;
+    margin-bottom: .75rem;
+    align-items: flex-start;
+}
+
+.view-row-label {
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    min-width: 72px;
+    padding-top: .55rem;
+}
+
+.view-row-value {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .55rem .85rem;
+    font-size: .875rem;
+    word-break: break-all;
+}
+
+/* ============================================================
+   Reveal area
+   ============================================================ */
+.reveal-area {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .8rem 1rem;
+    margin-bottom: .5rem;
+    min-height: 2.8rem;
+    display: flex;
+    align-items: center;
+}
+
+.reveal-text {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: .875rem;
+    word-break: break-all;
+    color: var(--text);
+    line-height: 1.6;
+}
+
+.reveal-text.masked {
+    color: var(--muted);
+    letter-spacing: .12em;
+    user-select: none;
+}
+
+.reveal-field-label {
+    font-size: .72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-right: .2rem;
+}
+
+.reveal-structured-row {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    padding: .35rem 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: .88rem;
+    width: 100%;
+}
+
+.reveal-structured-row:last-child {
+    border-bottom: none;
+}
+
+.reveal-domain-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    transition: color .15s;
+}
+
+.reveal-domain-link:hover {
+    text-decoration: underline;
+    color: #6ee7b7;
+}
+
+.reveal-pw-val {
+    font-family: var(--font-mono);
+    color: var(--text);
+    font-weight: 600;
+    letter-spacing: .03em;
+    word-break: break-all;
+}
+
+.reveal-cmd-box {
+    margin-top: .6rem;
+    background: var(--terminal-bg);
+    padding: .6rem .85rem;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    overflow-x: auto;
+    color: var(--accent);
+    width: 100%;
+}
+
+.reveal-token-pre {
+    background: var(--surface2);
+    padding: .75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    font-family: var(--font-mono);
+    font-size: .82rem;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text);
+    width: 100%;
+}
+
+.input-with-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.field-leading-icon {
+    position: absolute;
+    left: .75rem;
+    pointer-events: none;
+    font-size: .9rem;
+    color: var(--muted);
+    z-index: 1;
+}
+
+.input-with-icon-wrap input {
+    padding-left: 2.2rem;
+}
+
+.field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .2rem;
+}
+
+.field-label-row label {
+    margin-bottom: 0;
+}
+
+.btn-gen-pw {
+    padding: .2rem .6rem;
+    font-size: .72rem;
+    border-radius: 6px;
+    font-weight: 700;
+    background: var(--accent-subtle);
+    color: var(--accent);
+    border: 1px solid var(--border2);
+    cursor: pointer;
+    transition: all .15s;
+}
+
+.btn-gen-pw:hover {
+    background: rgba(52, 211, 153, .18);
+    border-color: var(--accent);
+}
+
+.reveal-btns-row {
+    display: flex;
+    gap: .4rem;
+    flex-wrap: wrap;
+    margin-bottom: .75rem;
+}
+
+/* ============================================================
+   Tabs
+   ============================================================ */
+.tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.2rem;
+}
+
+.tab-btn {
+    padding: .55rem 1.1rem;
+    background: none;
+    border: none;
+    font-family: var(--font-ui);
+    font-size: .875rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all .15s;
+}
+
+.tab-btn:hover {
+    color: var(--text);
+}
+
+.tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* ============================================================
+   SSH Terminal
+   ============================================================ */
+.ssh-status {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    padding: .2rem .65rem;
+    border-radius: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.ssh-status-connecting {
+    background: rgba(251, 191, 36, .12);
+    color: var(--yellow);
+    border: 1px solid rgba(251, 191, 36, .28);
+}
+
+.ssh-status-connected {
+    background: rgba(52, 211, 153, .12);
+    color: var(--green);
+    border: 1px solid rgba(52, 211, 153, .28);
+}
+
+.ssh-status-disconnected {
+    background: rgba(90, 122, 110, .12);
+    color: var(--muted);
+    border: 1px solid rgba(90, 122, 110, .28);
+}
+
+.ssh-status-error {
+    background: rgba(248, 113, 113, .12);
+    color: var(--red);
+    border: 1px solid rgba(248, 113, 113, .28);
+}
+
+.ssh-terminal {
+    background: var(--terminal-bg);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 380px;
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.05);
+}
+
+.ssh-terminal-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .5rem .8rem;
+    background: var(--terminal-toolbar-bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.terminal-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.terminal-dot.red {
+    background: #f87171;
+}
+
+.terminal-dot.yellow {
+    background: #fbbf24;
+}
+
+.terminal-dot.green {
+    background: #34d399;
+}
+
+.terminal-title {
+    font-size: .72rem;
+    color: var(--muted);
+    flex: 1;
+    text-align: center;
+}
+
+.terminal-clear-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    cursor: pointer;
+    padding: .15rem .4rem;
+    border-radius: 4px;
+    transition: all .15s;
+}
+
+.terminal-clear-btn:hover {
+    background: var(--border2);
+    color: var(--accent);
+}
+
+.ssh-output {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    font-size: .82rem;
+    line-height: 1.55;
+    color: color-mix(in srgb, var(--text) 78%, var(--accent) 22%);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.ssh-input-row {
+    display: flex;
+    border-top: 1px solid var(--border);
+    background: var(--terminal-toolbar-bg);
+    align-items: center;
+}
+
+.ssh-prompt {
+    padding: .6rem .7rem;
+    color: var(--accent);
+    font-size: .82rem;
+    flex-shrink: 0;
+}
+
+.ssh-cmd {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: .82rem;
+    outline: none;
+    padding: .6rem 0;
+    border-radius: 0;
+}
+
+.ssh-cmd:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.ssh-disconnect-btn {
+    padding: .45rem .85rem;
+    margin: .3rem;
+}
+
+.ssh-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+}
+
+/* ============================================================
+   .env Import
+   ============================================================ */
+.env-preview {
+    margin-top: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.env-preview-title {
+    font-size: .82rem;
+    color: var(--muted2);
+    margin-bottom: .5rem;
+}
+
+.env-select-all {
+    font-size: .82rem;
+    margin-bottom: .5rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    color: var(--muted2);
+}
+
+.env-select-all label {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: .82rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    cursor: pointer;
+}
+
+.env-select-all input {
+    width: auto;
+    margin: 0;
+}
+
+.env-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .5rem .75rem;
+    margin-bottom: .4rem;
+}
+
+.env-item label {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: .875rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.env-item input[type=checkbox] {
+    width: auto;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.env-key {
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.env-val-preview {
+    font-size: .78rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.env-no-items {
+    font-size: .85rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 1rem;
+}
+
+/* ============================================================
+   Backup
+   ============================================================ */
+.backup-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.backup-box h4 {
+    font-size: .9rem;
+    font-weight: 700;
+    margin-bottom: .3rem;
+}
+
+.backup-box p {
+    font-size: .82rem;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.upload-zone {
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 1.4rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    margin-bottom: .85rem;
+}
+
+.upload-zone:hover,
+.upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(52, 211, 153, .05);
+    box-shadow: 0 0 16px rgba(52, 211, 153, .08);
+}
+
+.upload-zone p {
+    font-size: .83rem;
+    color: var(--muted);
+    margin: 0;
+}
+
+/* ============================================================
+   Help text & inline code
+   ============================================================ */
+.help-text {
+    font-size: .82rem;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.inline-code {
+    font-family: var(--font-mono);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .1rem .4rem;
+    font-size: .8em;
+    color: var(--accent);
+}
+
+/* ============================================================
+   Toast
+   ============================================================ */
+.toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 24px;
+    padding: .6rem 1.4rem;
+    font-size: .875rem;
+    font-weight: 600;
+    box-shadow: var(--shadow), 0 0 20px rgba(52, 211, 153, 0.08);
+    z-index: 9999;
+    transition: transform .25s cubic-bezier(.34, 1.56, .64, 1);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.toast-show {
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast-error {
+    border-color: rgba(248, 113, 113, .4);
+    color: #fca5a5;
+}
+
+/* ============================================================
+   Scrollbars
+   ============================================================ */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(52, 211, 153, 0.18);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(52, 211, 153, 0.32);
+}
+
+/* ============================================================
+   Mobile menu drawer
+   ============================================================ */
+.topbar-desktop-only {
+    color: var(--muted);
+    /* shown on desktop, hidden on mobile — handled in media query */
+}
+
+.mobile-menu-btn {
+    display: none;
+    /* shown in media query */
+}
+
+.mobile-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .55);
+    backdrop-filter: blur(4px);
+    z-index: 300;
+    animation: fadeIn .18s ease;
+    /* reset native button styles */
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    cursor: default;
+    appearance: none;
+}
+
+.mobile-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(280px, 85vw);
+    background: var(--surface);
+    background-image: var(--noise);
+    border-left: 1px solid var(--border2);
+    z-index: 301;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, .4);
+    animation: slideInRight .22s cubic-bezier(.34, 1.2, .64, 1);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+    }
+
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.mobile-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.mobile-drawer-body {
+    display: flex;
+    flex-direction: column;
+    padding: .75rem .9rem;
+    gap: .25rem;
+    flex: 1;
+}
+
+.mobile-drawer-item {
+    justify-content: flex-start !important;
+    width: 100%;
+    font-size: .9rem !important;
+    padding: .65rem 1rem !important;
+}
+
+.mobile-drawer-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: .4rem 0;
+}
+
+/* Filter FAB (floating action button) */
+.mobile-sidebar-fab {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+    color: #021a10;
+    border: none;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(52, 211, 153, .4);
+    z-index: 50;
+    transition: transform .15s, box-shadow .15s;
+}
+
+.mobile-sidebar-fab:hover {
+    transform: scale(1.07);
+    box-shadow: 0 6px 28px rgba(52, 211, 153, .55);
+}
+
+.mobile-sidebar-fab:active {
+    transform: scale(.95);
+}
+
+/* Sidebar mobile sheet */
+.sidebar.mobile-open {
+    display: flex !important;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    z-index: 250;
+    border-right: none;
+    overflow-y: auto;
+    animation: slideUp .22s cubic-bezier(.34, 1.2, .64, 1);
+    padding-bottom: 5rem;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(30px);
+        opacity: .4;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 768px) {
+
+    /* Topbar */
+    .topbar {
+        padding: .65rem 1rem;
+    }
+
+    .topbar-desktop-only {
+        display: none !important;
+    }
+
+    .mobile-menu-btn {
+        display: inline-flex !important;
+    }
+
+    .topbar-actions {
+        gap: .35rem;
+    }
+
+    .topbar-count {
+        display: none;
+    }
+
+    /* Sidebar hidden on mobile, shown via FAB */
+    .sidebar {
+        display: none;
+    }
+
+    #mobile-sidebar-btn {
+        display: flex !important;
+    }
+
+    /* Grid single column */
+    .secrets-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .main {
+        padding: 1rem;
+    }
+
+    /* Auth card full width */
+    .auth-card {
+        padding: 1.75rem 1.25rem;
+        border-radius: 14px;
+    }
+
+    /* Modals full-screen on mobile */
+    .modal-backdrop {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .modal {
+        border-radius: 18px 18px 0 0;
+        max-height: 92vh;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .modal-lg {
+        max-width: 100%;
+    }
+
+    /* Type selector */
+    .type-selector {
+        grid-template-columns: 1fr;
+    }
+
+    /* SSH form */
+    .ssh-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ssh-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Reveal buttons */
+    .reveal-btns-row {
+        flex-wrap: wrap;
+    }
+
+    /* SSH terminal height */
+    .ssh-terminal {
+        height: 300px;
+    }
+
+    /* Toast bottom safe area */
+    .toast {
+        bottom: 5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .topbar-brand {
+        font-size: .95rem;
+    }
+
+    .topbar-brand span {
+        font-size: 1.1rem;
+    }
+
+    .secret-card-actions {
+        opacity: 1;
+        /* always visible on touch */
+    }
+}
+
+/* ============================================================
+   SSH Terminal — Fullscreen mode & toolbar controls
+   Append these rules to the bottom of style.css
+   ============================================================ */
+
+/* ── Toolbar control buttons (font-size, copy, fullscreen) ── */
+.ssh-font-controls {
+    display: flex;
+    align-items: center;
+    gap: .2rem;
+}
+
+/*
+ * Small icon/text buttons that live in the SSH modal header.
+ * Used for: font-down, font-up, copy-output, fullscreen-toggle.
+ */
+.ssh-ctrl-btn {
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--muted2);
+    cursor: pointer;
+    display: inline-flex;
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    font-weight: 700;
+    gap: .2rem;
+    justify-content: center;
+    line-height: 1;
+    padding: .3rem .5rem;
+    transition: background .15s, border-color .15s, color .15s;
+    white-space: nowrap;
+}
+
+.ssh-ctrl-btn:hover {
+    background: rgba(52, 211, 153, .1);
+    border-color: rgba(52, 211, 153, .3);
+    color: var(--accent);
+}
+
+.ssh-ctrl-btn:active {
+    transform: scale(.94);
+}
+
+/* Slightly wider padding for the icon-only fullscreen button */
+.ssh-fullscreen-btn {
+    padding: .3rem .42rem;
+}
+
+/* ── Backdrop: stretch to fill viewport in fullscreen ── */
+#ssh-backdrop.ssh-fullscreen-active {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+}
+
+/* ── Modal: fullscreen layout ── */
+#ssh-modal.ssh-fullscreen {
+    animation: none !important;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    inset: 0;
+    margin: 0;
+    max-height: 100vh;
+    max-width: 100vw;
+    overflow: hidden;
+    position: fixed;
+    transform: none !important;
+    width: 100vw;
+    z-index: 9000;
+}
+
+/* Sticky header must still be visible */
+#ssh-modal.ssh-fullscreen .modal-header {
+    flex-shrink: 0;
+}
+
+/* Body fills remaining vertical space */
+#ssh-modal.ssh-fullscreen .modal-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    /* critical: allows flex child to shrink below content size */
+    overflow: hidden;
+    padding: .6rem .9rem;
+}
+
+/* Connect-area: centred, reasonable max-width so it doesn't sprawl */
+#ssh-modal.ssh-fullscreen #ssh-connect-area {
+    margin: 0 auto;
+    max-width: 680px;
+    overflow-y: auto;
+    width: 100%;
+}
+
+/* Terminal wrap fills the body */
+#ssh-modal.ssh-fullscreen #ssh-terminal-wrap {
+    display: flex !important;
+    /* override .hidden's display:none once the
+                                   terminal is open; CSS specificity wins here
+                                   only when #ssh-terminal-wrap is not hidden */
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Terminal itself stretches to fill the wrap */
+#ssh-modal.ssh-fullscreen .ssh-terminal {
+    border-radius: 6px;
+    flex: 1;
+    height: 100%;
+}
+
+/* Output area: remove fixed height, let flexbox size it */
+#ssh-modal.ssh-fullscreen .ssh-output {
+    flex: 1;
+    height: 0;
+    /* flex item trick — grows to fill available space */
+    max-height: none;
+}
+
+/* ── Smooth width transition when exiting fullscreen ── */
+#ssh-modal:not(.ssh-fullscreen) {
+    transition: max-width .22s cubic-bezier(.34, 1.2, .64, 1);
+}
+
+/* ── Responsive: hide the fullscreen button on mobile
+      (the modal already occupies most of the screen there) ── */
+@media (max-width: 768px) {
+    .ssh-fullscreen-btn {
+        display: none;
+    }
+
+    .ssh-font-controls {
+        display: none;
+        /* also hide font controls on very small screens */
+    }
+}
+
+/* ============================================================
+   Vault & Team UI Styles (Phase 3)
+   ============================================================ */
+
+.sidebar-vault-box {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.vault-select-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+}
+
+.vault-select {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.45rem 0.65rem;
+    font-family: var(--font-ui);
+    font-size: 0.825rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.vault-select:focus {
+    border-color: var(--accent);
+}
+
+.vault-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    flex-wrap: nowrap;
+}
+
+.badge-vault {
+    background: rgba(52, 211, 153, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(52, 211, 153, 0.28);
+    text-transform: capitalize;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    letter-spacing: 0.03em;
+}
+
+.vault-badge-row .btn-xs {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.72rem;
+    border-radius: 6px;
+}
+
+/* Team Management Modal */
+.team-identity-banner {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.team-members-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.team-members-header h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.add-member-box {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.add-member-box h5 {
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    color: var(--accent);
+}
+
+.grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.team-members-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.team-member-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0.9rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s ease;
+}
+
+.team-member-card:hover {
+    border-color: var(--border2);
+}
+
+.member-info .member-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.tag-you {
+    font-size: 0.7rem;
+    color: var(--accent);
+    background: var(--accent-subtle);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-weight: normal;
+}
+
+.member-info .member-id {
+    font-size: 0.75rem;
+    color: var(--muted2);
+    margin-top: 0.2rem;
+}
+
+.member-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.member-role-select {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.78rem;
+    outline: none;
+}
+
+/* Audit Log Modal */
+.audit-log-container {
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+}
+
+.audit-table th {
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid var(--border2);
+    color: var(--muted2);
+    font-family: var(--font-ui);
+    font-weight: 600;
+}
+
+.audit-table td {
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.audit-time {
+    color: var(--muted2);
+    white-space: nowrap;
+}
+
+.audit-action-tag {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.audit-action-create,
+.audit-action-create_vault,
+.audit-action-create_secret {
+    background: #dcfce7;
+    color: #14532d;
+}
+
+.audit-action-read,
+.audit-action-read_secret,
+.audit-action-list_secrets {
+    background: #dbeafe;
+    color: #1e3a8a;
+}
+
+.audit-action-update,
+.audit-action-update_secret,
+.audit-action-set_role {
+    background: #fef3c7;
+    color: #78350f;
+}
+
+.audit-action-delete,
+.audit-action-delete_secret,
+.audit-action-delete_vault,
+.audit-action-remove_member {
+    background: #fee2e2;
+    color: #7f1d1d;
+}
+
+.audit-action-add_member,
+.audit-action-import {
+    background: #ede9fe;
+    color: #4c1d95;
+}
+
+.audit-details {
+    color: var(--text);
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

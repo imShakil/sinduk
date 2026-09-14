@@ -28,7 +28,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=pacli --cov-report=xml --cov-report=term
+          pytest --cov=sinduk --cov-report=xml --cov-report=term
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@299e4b793aaa83bf2aba7c9c14bedbb485688ec4

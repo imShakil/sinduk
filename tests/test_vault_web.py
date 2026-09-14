@@ -7,25 +7,25 @@ import pytest
 from flask import Flask
 from cryptography.fernet import Fernet
 
-import pacli.web.app as web_app
-from pacli.vault import VaultManager, set_user_identity
-from pacli.store import SecretStore
+import sinduk.web.app as web_app
+from sinduk.vault import VaultManager, set_user_identity
+from sinduk.store import SecretStore
 
 
 @pytest.fixture(autouse=True)
 def isolated_pacli_dir(tmp_path, monkeypatch):
-    test_config = str(tmp_path / "pacli_config")
+    test_config = str(tmp_path / "sinduk_config")
     os.makedirs(test_config, exist_ok=True)
 
-    monkeypatch.setattr("pacli.vault.PACLI_DIR", test_config)
-    monkeypatch.setattr("pacli.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
-    monkeypatch.setattr("pacli.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
-    monkeypatch.setattr("pacli.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
+    monkeypatch.setattr("sinduk.vault.PACLI_DIR", test_config)
+    monkeypatch.setattr("sinduk.vault.VAULTS_DIR", os.path.join(test_config, "vaults"))
+    monkeypatch.setattr("sinduk.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
+    monkeypatch.setattr("sinduk.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
 
     store_salt_path = os.path.join(test_config, "salt.bin")
     store_hash_path = os.path.join(test_config, "password_hash.bin")
-    monkeypatch.setattr("pacli.store.SALT_PATH", store_salt_path)
-    monkeypatch.setattr("pacli.store.PASSWORD_HASH_PATH", store_hash_path)
+    monkeypatch.setattr("sinduk.store.SALT_PATH", store_salt_path)
+    monkeypatch.setattr("sinduk.store.PASSWORD_HASH_PATH", store_hash_path)
 
     yield test_config
 
