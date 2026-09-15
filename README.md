@@ -26,7 +26,6 @@ ___
 - 💻 **Modern Web UI**: Interactive browser dashboard (`sinduk web`) featuring a Vault Switcher, Secrets CRUD, Team Member Management, Audit Log Viewer, and an in-browser SSH Terminal.
 - 🔑 **SSH Key Management**: Store and auto-connect to SSH servers using credentials or key files.
 - 📋 **Clipboard & Pipeline Integration**: Copy secrets directly to clipboard (`--clip`) or pipe command outputs (`sinduk cc`).
-- 🔗 **LinklyHQ URL Shortening**: Built-in shortlink generator with click tracking.
 
 ---
 
@@ -73,11 +72,12 @@ sinduk --help
 | `team` | 👥 Team vault management (create vaults, add members, audit log) |
 | `sync` | 🔄 Sync encrypted vaults with a team relay server or shared directory |
 | `server` | 🖥️ Start, stop, and manage the self-hosted zero-knowledge sync server |
+| `login` | 🔑 Seamless 1-click terminal authentication with self-hosted server |
+| `logout` | 🚪 Log out and remove stored sync credentials |
 | `backup` | 📦 Encrypted backup — export and import secrets across devices |
 | `web` | 🌐 Launch and manage the local Web UI dashboard |
 | `ssh` | 🔑 Connect to SSH server using saved credentials |
 | `export` | Export secrets to JSON or CSV format |
-| `short` | Shorten URLs via LinklyHQ |
 | `cc` | 📋 Copy stdin / pipeline output to clipboard |
 | `version` | Show sinduk version and project details |
 
@@ -144,21 +144,26 @@ Sinduk offers seamless zero-knowledge synchronization across team members with *
 ### Option A: Self-Hosted Zero-Knowledge Relay Server (Recommended)
 
 #### 1. Start the Sync Server (DevOps / Admin)
-Run on any Linux server, VPS, or cloud container:
+Run with Docker:
+```sh
+docker-compose up -d
+```
+Or directly via the CLI:
 ```sh
 # Start the server daemon on port 58380
 sinduk server start --host 0.0.0.0 --port 58380 --daemon
-
-# Generate a team token
-sinduk server token create --name "DevTeam" --role admin
 ```
 
-#### 2. Configure Team Members
-Each team member configures their client once. Sinduk actively verifies server connectivity and bearer token validity before saving:
+#### 2. Pair CLI in 1-Click (`sinduk login`)
+Team members can connect and authenticate instantly:
 ```sh
-sinduk sync config set --server http://secrets.mycompany.internal:58380 --token sinduk_tok_...
+# Connect with interactive browser authorization
+sinduk login http://secrets.mycompany.internal:58380
+
+# Or authenticate directly in the terminal (headless / SSH)
+sinduk login http://secrets.mycompany.internal:58380 --no-browser
 ```
-*(Tip: Use `--force` to save configuration offline without live network checks).*
+*(You can also configure tokens manually using `sinduk sync config set`).*
 
 #### 3. Automatic Background Sync ⚡
 Once configured, **all team vault changes are pushed automatically** whenever you modify secrets or membership:

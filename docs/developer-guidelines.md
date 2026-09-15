@@ -23,13 +23,12 @@ pacli --help
 ├── docs
 │   ├── developer-guidelines.md
 │   └── index.html
-├── pacli
+├── sinduk
 │   ├── __init__.py
 │   ├── audit.py
 │   ├── cli.py
 │   ├── decorators.py
 │   ├── helpers.py
-│   ├── linklyhq.py
 │   ├── log.py
 │   ├── server.py
 │   ├── ssh_utils.py
@@ -41,8 +40,8 @@ pacli --help
 │   ├── commands
 │   │   ├── __init__.py
 │   │   ├── admin.py
-│   │   ├── ai.py
 │   │   ├── backup.py
+│   │   ├── login.py
 │   │   ├── secrets.py
 │   │   ├── server.py
 │   │   ├── ssh.py
