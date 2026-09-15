@@ -219,6 +219,33 @@ def _resolve_secret_payload(secret_type, arg1, arg2, key_path, ssh_port, ssh_opt
     return _append_ssh_parts(user_ip, key_path, ssh_port, ssh_opts)
 
 
+def _try_auto_push(vault_name: str, fernet) -> None:
+    """Helper to auto-push vault changes to sync server if configured."""
+    try:
+        from ..sync_client import auto_push_vault
+
+        res = auto_push_vault(vault_name, fernet)
+        if res.get("synced"):
+            v_str = f" (v{res['version']})" if res.get("version") else ""
+            click.echo(f"☁️ Auto-synced vault '{vault_name}'{v_str} to server.")
+        elif res.get("reason") == "error":
+            click.echo("⚠️ Sync note: Saved locally (sync server unreachable).")
+    except Exception as e:
+        logger.debug(f"Auto-push error ignored: {e}")
+
+
+def _try_auto_pull(vault_name: str, fernet) -> None:
+    """Helper to auto-pull vault changes from sync server if configured."""
+    try:
+        from ..sync_client import auto_pull_vault
+
+        res = auto_pull_vault(vault_name, fernet)
+        if res.get("synced") and not res.get("up_to_date"):
+            click.echo(f"☁️ Auto-pulled latest updates for vault '{vault_name}' from server.")
+    except Exception as e:
+        logger.debug(f"Auto-pull error ignored: {e}")
+
+
 def _save_vault_secret(store, vault_name, label, secret_type, arg1, arg2, key_path, ssh_port, ssh_opts):
     store.require_fernet()
     if store.fernet is None:
@@ -231,6 +258,7 @@ def _save_vault_secret(store, vault_name, label, secret_type, arg1, arg2, key_pa
         vm.save_secret(vault_name, label, secret_payload, secret_type, fernet)
         logger.info(f"Secret '{label}' ({secret_type}) saved to vault '{vault_name}'.")
         click.echo(f"✅ Saved '{label}' to vault '{vault_name}'.")
+        _try_auto_push(vault_name, fernet)
     except (PermissionError, ValueError, RuntimeError) as e:
         click.echo(f"❌ {e}")
 
@@ -377,6 +405,7 @@ def _get_vault_target(vault_name, target, clip, store):
     if store.fernet is None:
         click.echo(NO_MASTER_KEY_MSG)
         return
+    _try_auto_pull(vault_name, store.fernet)
     vm = VaultManager()
     try:
         matches = vm.get_secrets_by_label(vault_name, target, store.fernet)
@@ -477,6 +506,9 @@ def get_by_id(secret_id, clip):
 
 
 def _list_vault_secrets(vault_name):
+    store = SecretStore()
+    if store.is_master_set() and hasattr(store, "fernet") and store.fernet:
+        _try_auto_pull(vault_name, store.fernet)
     vm = VaultManager()
     try:
         secrets = vm.list_secrets(vault_name)
@@ -550,6 +582,7 @@ def _update_vault_secret(vault_name, label, store):
     try:
         vm.update_secret(vault_name, selected["id"], new_secret, fernet)
         click.echo(SECRET_UPDATED_MSG)
+        _try_auto_push(vault_name, fernet)
     except (PermissionError, ValueError) as e:
         click.echo(f"❌ {e}")
 
@@ -578,6 +611,7 @@ def _update_vault_secret_by_id(vault_name, secret_id, store):
     try:
         vm.update_secret(vault_name, secret["id"], new_secret, fernet)
         click.echo(SECRET_UPDATED_MSG)
+        _try_auto_push(vault_name, fernet)
     except (PermissionError, ValueError) as e:
         click.echo(f"❌ {e}")
 
@@ -726,6 +760,7 @@ def _delete_vault_secret(vault_name, label, store):
     try:
         vm.delete_secret(vault_name, selected["id"])
         click.echo(VAULT_DELETED_MSG)
+        _try_auto_push(vault_name, fernet)
     except (PermissionError, ValueError) as e:
         click.echo(f"❌ {e}")
 
@@ -751,6 +786,7 @@ def _delete_vault_secret_by_id(vault_name, secret_id, store, yes=False):
     try:
         vm.delete_secret(vault_name, secret["id"])
         click.echo(VAULT_DELETED_MSG)
+        _try_auto_push(vault_name, fernet)
     except (PermissionError, ValueError) as e:
         click.echo(f"❌ {e}")
 
@@ -815,6 +851,7 @@ def _delete_vault_target(vault_name, target, yes, store):
         try:
             vm.delete_secret(vault_name, selected["id"])
             click.echo(VAULT_DELETED_MSG)
+            _try_auto_push(vault_name, fernet)
         except (PermissionError, ValueError) as e:
             click.echo(f"❌ {e}")
         return

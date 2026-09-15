@@ -15,6 +15,7 @@ from ..sync_client import (
     push_to_server,
     pull_from_server,
     get_server_status,
+    validate_sync_server,
 )
 from ..log import get_logger
 from ..decorators import master_password_required
@@ -44,19 +45,35 @@ def config_group():
 @config_group.command("set")
 @click.option("--server", "-s", "server_url", help="Sync server URL (e.g. https://sinduk.example.com:58380).")
 @click.option("--token", "-t", "token", help="Bearer token for the sync server.")
-def sync_config_set(server_url, token):
-    """Save default sync server URL and token."""
+@click.option("--no-test", "--force", is_flag=True, help="Skip active network connectivity test.")
+def sync_config_set(server_url, token, no_test):
+    """Save default sync server URL and token with active connection verification."""
     if not server_url and not token:
         click.echo("❌ Please provide at least one of --server or --token.")
         return
 
+    current_cfg = get_sync_config()
+    target_server = (server_url or current_cfg.get("server_url") or "").rstrip("/")
+    target_token = token or current_cfg.get("token") or ""
+
+    if not no_test and target_server:
+        click.echo(f"🔍 Testing connection to {target_server}...")
+        test_res = validate_sync_server(target_server, target_token or None)
+        if not test_res.get("ok"):
+            click.echo(f"\n❌ Connection test failed:\n   {test_res.get('error')}")
+            click.echo("\n⚠️ Configuration was NOT saved.")
+            click.echo("   Check the server IP/port or use --force to save anyway.")
+            return
+
     cfg = set_sync_config(server_url=server_url, token=token)
-    click.echo("✅ Sync configuration updated.")
+    click.echo("\n✅ Sync configuration updated & verified!")
     if cfg.get("server_url"):
         click.echo(f"   Server: {cfg['server_url']}")
     if cfg.get("token"):
         masked = cfg["token"][:8] + "…" if len(cfg["token"]) > 8 else "…"
         click.echo(f"   Token:  {masked}")
+    if not no_test and target_server:
+        click.echo("🟢 Sync server connected successfully.")
 
 
 @config_group.command("show")

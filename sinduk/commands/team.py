@@ -88,6 +88,21 @@ def team_id(copy):
             logger.info("Failed to copy public key to clipboard.")
 
 
+def _try_auto_push(vault_name: str, fernet) -> None:
+    """Helper to auto-push vault changes to sync server if configured."""
+    try:
+        from ..sync_client import auto_push_vault
+
+        res = auto_push_vault(vault_name, fernet)
+        if res.get("synced"):
+            v_str = f" (v{res['version']})" if res.get("version") else ""
+            click.echo(f"☁️ Auto-synced vault '{vault_name}'{v_str} to server.")
+        elif res.get("reason") == "error":
+            click.echo("⚠️ Sync note: Saved locally (sync server unreachable).")
+    except Exception as e:
+        logger.debug(f"Auto-push error ignored: {e}")
+
+
 @team.command("create-vault")
 @click.argument("name")
 @click.option("--description", "-d", default="", help="Optional description for the vault.")
@@ -118,6 +133,7 @@ def create_vault(name, description):
         click.echo("   Your role:    admin")
         if description:
             click.echo(f"   Description:  {description}")
+        _try_auto_push(name, fernet)
         click.echo(f"\n💡 Use 'sinduk add --vault {name} ...' to add secrets to this vault.")
         click.echo(f"   Use 'sinduk team add-member {name} <user-id>' to invite team members.")
     except (ValueError, RuntimeError) as e:
@@ -230,6 +246,7 @@ def add_member(vault_name, user_id, user_name, role, public_key):
     try:
         vm.add_member(vault_name, user_id, user_name, role, fernet, target_public_key=public_key)
         click.echo(f"✅ Added {user_name} ({user_id}) to vault '{vault_name}' as {role}.")
+        _try_auto_push(vault_name, fernet)
     except (ValueError, PermissionError, RuntimeError) as e:
         click.echo(f"❌ {e}")
 
@@ -253,6 +270,7 @@ def remove_member(vault_name, user_id, rotate_key):
         click.echo(f"✅ Removed {user_id} from vault '{vault_name}'.")
         if rotate_key:
             click.echo("🔄 Vault encryption key was automatically rotated to revoke removed member's access.")
+        _try_auto_push(vault_name, fernet)
     except (ValueError, PermissionError) as e:
         click.echo(f"❌ {e}")
 
@@ -279,6 +297,7 @@ def rotate_key_cmd(vault_name):
         click.echo(f"✅ Key rotated successfully for vault '{vault_name}'!")
         click.echo(f"   Secrets re-encrypted: {res['secrets_reencrypted']}")
         click.echo(f"   Members re-wrapped:   {res['members_rewrapped']}")
+        _try_auto_push(vault_name, fernet)
     except (ValueError, PermissionError) as e:
         click.echo(f"❌ {e}")
 
@@ -351,11 +370,14 @@ def set_role(vault_name, user_id, role):
     """Change a member's role in a vault."""
     store = SecretStore()
     store.require_fernet()
+    fernet = store.fernet
 
     vm = VaultManager()
     try:
         vm.set_member_role(vault_name, user_id, role)
         click.echo(f"✅ Updated {user_id}'s role to '{role}' in vault '{vault_name}'.")
+        if fernet:
+            _try_auto_push(vault_name, fernet)
     except (ValueError, PermissionError) as e:
         click.echo(f"❌ {e}")
 

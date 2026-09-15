@@ -63,22 +63,22 @@ sinduk --help
 
 | Command / Group | Description |
 |---|---|
-| `init` | Set or reset your master password |
-| `add` | Add a secret (`--pass`, `--token`, `--ssh`) with optional `--vault` |
-| `get` / `get-by-id` | Retrieve secrets by label or ID (`--clip` to copy) |
+| `init` | (Optional) Explicitly set or reset the master password |
+| `add` | Add a secret (auto-detects token/password/ssh, or `--type`) with optional `--vault` |
+| `get` | Retrieve secrets by label or ID (`--clip` to copy) |
 | `list` | List all saved secrets (supports `--vault`) |
-| `update` / `update-by-id` | Update an existing secret value |
-| `delete` / `delete-by-id` | Delete a secret |
+| `update` | Update a secret by label or ID |
+| `delete` | Delete a secret by label or ID (`-y` to skip confirmation prompt) |
+| `passwd` | Change the master password without losing secrets (re-encrypts store) |
 | `team` | 👥 Team vault management (create vaults, add members, audit log) |
 | `sync` | 🔄 Sync encrypted vaults with a team relay server or shared directory |
 | `server` | 🖥️ Start, stop, and manage the self-hosted zero-knowledge sync server |
-| `backup` | 📦 Encrypted backup export and import across machines |
-| `web` | 🌐 Launch or manage the local Web UI dashboard |
-| `ssh` | Connect to an SSH server using saved credentials |
-| `export` | Export secrets to unencrypted JSON or CSV |
+| `backup` | 📦 Encrypted backup — export and import secrets across devices |
+| `web` | 🌐 Launch and manage the local Web UI dashboard |
+| `ssh` | 🔑 Connect to SSH server using saved credentials |
+| `export` | Export secrets to JSON or CSV format |
 | `short` | Shorten URLs via LinklyHQ |
-| `cc` | Copy stdin / pipeline output to clipboard |
-| `change-master-key` | Re-encrypt all secrets with a new master password |
+| `cc` | 📋 Copy stdin / pipeline output to clipboard |
 | `version` | Show sinduk version and project details |
 
 ---
@@ -121,9 +121,9 @@ Available roles:
 ### 4. Working with Secrets in Team Vaults
 Simply pass `--vault <name>` or `-v <name>` to any secret command:
 ```sh
-# Add a secret to the team vault
-sinduk add --vault dev-infra --password postgres_db postgres db_pass_secret
-sinduk add --vault dev-infra --token stripe_key sk_test_12345
+# Add a secret to the team vault (using --type or auto-detection)
+sinduk add --vault dev-infra --type password postgres_db postgres db_pass_secret
+sinduk add --vault dev-infra --type token stripe_key sk_test_12345
 
 # List secrets in the team vault
 sinduk list --vault dev-infra
@@ -139,7 +139,9 @@ sinduk team audit-log dev-infra
 
 ## 🔄 Syncing Vaults Across the Team
 
-### Option A: Self-Hosted Zero-Knowledge Relay Server
+Sinduk offers seamless zero-knowledge synchronization across team members with **automatic background push**, live server verification, and offline directory fallback.
+
+### Option A: Self-Hosted Zero-Knowledge Relay Server (Recommended)
 
 #### 1. Start the Sync Server (DevOps / Admin)
 Run on any Linux server, VPS, or cloud container:
@@ -152,22 +154,36 @@ sinduk server token create --name "DevTeam" --role admin
 ```
 
 #### 2. Configure Team Members
-Each team member configures their client once:
+Each team member configures their client once. Sinduk actively verifies server connectivity and bearer token validity before saving:
 ```sh
 sinduk sync config set --server http://secrets.mycompany.internal:58380 --token sinduk_tok_...
 ```
+*(Tip: Use `--force` to save configuration offline without live network checks).*
 
-#### 3. Push and Pull Updates
+#### 3. Automatic Background Sync ⚡
+Once configured, **all team vault changes are pushed automatically** whenever you modify secrets or membership:
+- `sinduk add --vault dev-infra ...` ➡️ *Auto-pushed to server*
+- `sinduk update --vault dev-infra ...` ➡️ *Auto-pushed to server*
+- `sinduk delete --vault dev-infra ...` ➡️ *Auto-pushed to server*
+- `sinduk team add-member dev-infra ...` ➡️ *Auto-pushed to server*
+
+#### 4. Manual Push, Pull, and Status
+You can also manually synchronize or check remote vault versions at any time:
 ```sh
 # Push local vault updates to the server
 sinduk sync push dev-infra
 
-# Check status of remote vault
+# Check status of remote vault vs local vault
 sinduk sync status dev-infra
 
 # Pull and merge latest changes from the server
 sinduk sync pull dev-infra
 ```
+
+#### 5. Web UI Sync Controls 🌐
+When using the browser dashboard (`sinduk web`):
+- Click **"Sync Server"** in the top navigation bar to configure server URL and bearer token with live connection testing.
+- Use the **"🔄 Sync"** 1-click button on any team vault card to instantly pull and push changes.
 
 ---
 

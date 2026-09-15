@@ -38,7 +38,7 @@ def isolated_pacli_dir(tmp_path, monkeypatch):
     sync_cfg_path = os.path.join(test_config, "sync_config.json")
     monkeypatch.setattr("sinduk.sync_client.SYNC_CONFIG_PATH", sync_cfg_path)
 
-    yield test_config
+    return test_config
 
 
 @pytest.fixture
@@ -95,11 +95,13 @@ class TestSyncServerDB:
         # Fetch blob
         data, meta = db.get_blob("team-alpha")
         assert data == blob1
+        assert meta is not None
         assert meta["version"] == 1
         assert meta["updated_by"] == "Alice"
 
         # Check status
         status = db.get_status("team-alpha")
+        assert status is not None
         assert status["version"] == 1
         assert status["size"] == len(blob1)
 
@@ -116,6 +118,7 @@ class TestSyncServerDB:
 
         data2, meta2 = db.get_blob("team-alpha")
         assert data2 == blob2
+        assert meta2 is not None
         assert meta2["version"] == 2
         assert meta2["updated_by"] == "Bob"
 
@@ -189,9 +192,9 @@ class TestServerCliAndSyncClient:
         assert "QA" in res_list.output
 
     def test_sync_config_cli(self, runner, isolated_pacli_dir):
-        # Config set
+        # Config set (offline mode with --force)
         res_set = runner.invoke(
-            cli, ["sync", "config", "set", "--server", "http://127.0.0.1:58380", "--token", "tok123"]
+            cli, ["sync", "config", "set", "--server", "http://127.0.0.1:58380", "--token", "tok123", "--force"]
         )
         assert res_set.exit_code == 0
         assert "Sync configuration updated" in res_set.output

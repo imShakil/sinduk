@@ -27,7 +27,7 @@ def isolated_pacli_dir(tmp_path, monkeypatch):
     monkeypatch.setattr("sinduk.store.SALT_PATH", store_salt_path)
     monkeypatch.setattr("sinduk.store.PASSWORD_HASH_PATH", store_hash_path)
 
-    yield test_config
+    return test_config
 
 
 @pytest.fixture
@@ -51,6 +51,7 @@ def app_client(isolated_pacli_dir, master_fernet, user_identity):
     require_auth = web_app._build_require_auth(store)
     web_app._register_csrf_same_origin_protection(app)
     web_app._register_vault_routes(app, store, vault_manager, require_auth)
+    web_app._register_sync_routes(app, store, vault_manager, require_auth)
 
     client = app.test_client()
 
@@ -205,3 +206,27 @@ class TestVaultWebApi:
         data = res.get_json()
         assert data["user_name"] == "WebUser"
         assert data["role"] == "admin"
+
+    def test_sync_endpoints(self, app_client, master_fernet):
+        client, vm, store = app_client
+        vm.create_vault("sync-web-vault", master_fernet=master_fernet)
+
+        # 1. Get sync config (empty by default)
+        res_cfg = client.get("/api/sync/config", base_url=self.BASE_URL)
+        assert res_cfg.status_code == 200
+        assert "server_url" in res_cfg.get_json()
+
+        # 2. Set sync config
+        res_set = client.post(
+            "/api/sync/config",
+            json={"server_url": "http://127.0.0.1:58380", "token": "sinduk_tok_test123"},
+            headers=self.HEADERS,
+            base_url=self.BASE_URL,
+        )
+        assert res_set.status_code == 200
+        assert res_set.get_json()["success"] is True
+
+        # 3. Vault sync status
+        res_st = client.get("/api/vaults/sync-web-vault/sync/status", base_url=self.BASE_URL)
+        assert res_st.status_code == 200
+        assert "local" in res_st.get_json()

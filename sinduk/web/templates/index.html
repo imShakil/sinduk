@@ -78,6 +78,7 @@
 
         <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="openEnvModal()" title="Import .env file">📥 .env</button>
         <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="openBackupModal()">☁️ Backup</button>
+        <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="openSyncModal()" title="Configure sync server">🔄 Sync</button>
         <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="openSSHModal()">⌨️ SSH</button>
         <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Add</button>
         <button class="btn btn-ghost btn-sm topbar-desktop-only" onclick="doLogout()">Sign out</button>
@@ -102,6 +103,7 @@
           </div>
           <div id="vault-badge-row" class="vault-badge-row hidden">
             <span id="vault-role-badge" class="badge badge-vault">Admin</span>
+            <button class="btn btn-ghost btn-xs" onclick="triggerVaultSync()" title="Sync Vault with Server">🔄 Sync</button>
             <button class="btn btn-ghost btn-xs" onclick="openTeamModal()" title="Manage Team Members">👥 Team</button>
             <button class="btn btn-ghost btn-xs" onclick="openAuditModal()" title="View Audit Log">📋 Log</button>
           </div>
@@ -515,11 +517,54 @@
 
         <!-- Members list -->
         <div id="team-members-list" class="team-members-list"></div>
+
+        <!-- Team Sync Section -->
+        <div class="team-sync-box" style="margin-top:1.25rem;padding:0.75rem 1rem;border-radius:var(--radius);background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+          <div>
+            <div style="font-weight:600;font-size:0.875rem;display:flex;align-items:center;gap:0.4rem;">
+              <span>🔄</span> <span>Vault Cloud Sync</span>
+            </div>
+            <div id="team-sync-status-text" style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">Status: Checking…</div>
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-ghost btn-xs" onclick="doVaultPull()" title="Pull latest changes from server">⬇️ Pull</button>
+            <button class="btn btn-primary btn-xs" onclick="doVaultPush()" title="Push local changes to server">⬆️ Push</button>
+          </div>
+        </div>
+
         <div id="team-msg" class="alert hidden" style="margin-top:.75rem"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-danger btn-sm" id="delete-vault-btn" onclick="doDeleteCurrentVault()">🗑 Delete Vault</button>
         <button class="btn btn-ghost" onclick="closeTeamModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sync Server Settings modal -->
+  <div id="sync-backdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🔄 Sync Server Settings</h3>
+        <button class="modal-close" onclick="closeSyncModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="sync-server-status-banner" class="alert alert-info" style="margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;">
+          <span id="sync-server-status-indicator">⚪ Checking connection…</span>
+        </div>
+        <div class="field">
+          <label for="sync-server-url">Sync Server URL</label>
+          <input type="text" id="sync-server-url" placeholder="e.g. http://192.168.68.122:58380" />
+        </div>
+        <div class="field">
+          <label for="sync-server-token">Access Token (Bearer)</label>
+          <input type="password" id="sync-server-token" placeholder="sinduk_tok_... (leave empty to keep existing)" />
+        </div>
+        <div id="sync-settings-msg" class="alert hidden" style="margin-top:.5rem"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeSyncModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSyncSettings()">Save & Test</button>
       </div>
     </div>
   </div>
@@ -552,6 +597,7 @@
     <div class="mobile-drawer-body">
       <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();openEnvModal()">📥 Import .env</button>
       <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();openBackupModal()">☁️ Backup</button>
+      <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();openSyncModal()">🔄 Sync Server</button>
       <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();openSSHModal()">⌨️ SSH</button>
       <hr class="mobile-drawer-divider"/>
       <button class="btn btn-ghost mobile-drawer-item" onclick="closeMobileMenu();doLogout()">Sign out</button>

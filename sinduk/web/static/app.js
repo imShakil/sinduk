@@ -1532,6 +1532,7 @@ async function loadTeamDetails() {
   if (addBtn) addBtn.style.display = isAdmin ? 'inline-flex' : 'none';
 
   renderTeamMembers(members);
+  await loadVaultSyncStatus();
 }
 
 function _renderMemberRoleOptions(currentRole) {
@@ -1685,6 +1686,119 @@ async function loadAuditLog() {
       </tbody>
     </table>
   `;
+}
+
+// ------------------------------------------------------------------
+// Sync Server Management & 1-Click Sync
+// ------------------------------------------------------------------
+async function openSyncModal() {
+  hide('sync-settings-msg');
+  show('sync-backdrop');
+  await loadSyncSettings();
+}
+
+function closeSyncModal() { hide('sync-backdrop'); }
+
+async function loadSyncSettings() {
+  const ind = document.getElementById('sync-server-status-indicator');
+  const banner = document.getElementById('sync-server-status-banner');
+  if (ind) ind.textContent = '⚪ Checking connection…';
+
+  const res = await api('GET', '/api/sync/config');
+  if (res) {
+    document.getElementById('sync-server-url').value = res.server_url || '';
+    document.getElementById('sync-server-token').value = '';
+    document.getElementById('sync-server-token').placeholder = res.has_token
+      ? `Configured (${res.token_masked}) — leave empty to keep`
+      : 'sinduk_tok_...';
+
+    if (res.connected) {
+      if (banner) banner.className = 'alert alert-success';
+      if (ind) ind.textContent = `🟢 Connected to sync server (${res.server_url})`;
+    } else if (res.server_url) {
+      if (banner) banner.className = 'alert alert-warning';
+      if (ind) ind.textContent = `🔴 Configured but server unreachable (${res.server_url})`;
+    } else {
+      if (banner) banner.className = 'alert alert-info';
+      if (ind) ind.textContent = '⚪ No sync server configured yet.';
+    }
+  }
+}
+
+async function saveSyncSettings() {
+  const server_url = val('sync-server-url');
+  const token = val('sync-server-token');
+  hide('sync-settings-msg');
+
+  const res = await api('POST', '/api/sync/config', { server_url, token: token || undefined });
+  if (res?.success) {
+    showToast('✅ Sync server settings saved!');
+    await loadSyncSettings();
+    setTimeout(closeSyncModal, 800);
+  } else {
+    showMsg('sync-settings-msg', 'error', res?.error || 'Failed to save settings.');
+  }
+}
+
+async function loadVaultSyncStatus() {
+  const statusEl = document.getElementById('team-sync-status-text');
+  if (!statusEl || !S.currentVault) return;
+  statusEl.textContent = 'Status: Checking…';
+
+  const res = await api('GET', `/api/vaults/${S.currentVault}/sync/status`);
+  if (!res) {
+    statusEl.textContent = 'Status: Offline / Local only';
+    return;
+  }
+  const local = res.local || {};
+  const server = res.server;
+
+  if (server?.error) {
+    statusEl.textContent = `⚠️ Server: ${server.error}`;
+  } else if (server && server.version) {
+    const pushedStr = local.last_push_at ? ` (Last pushed v${local.last_push_version || '?'})` : '';
+    statusEl.textContent = `🟢 Server version: v${server.version}${pushedStr}`;
+  } else if (local.last_push_at) {
+    const pDate = new Date(local.last_push_at * 1000).toLocaleString();
+    statusEl.textContent = `☁️ Last pushed: ${pDate} (v${local.last_push_version || 1})`;
+  } else {
+    statusEl.textContent = '⚪ Not yet synced to server.';
+  }
+}
+
+async function doVaultPush() {
+  if (!S.currentVault) return;
+  showToast(`☁️ Pushing vault '${S.currentVault}'…`);
+  const res = await api('POST', `/api/vaults/${S.currentVault}/sync/push`);
+  if (res?.success) {
+    showToast(`✅ Pushed vault '${S.currentVault}' (v${res.result?.version || 'latest'}) to server!`);
+    await loadVaultSyncStatus();
+  } else {
+    showToast(`❌ Push failed: ${res?.error || 'Server error'}`, 'error');
+  }
+}
+
+async function doVaultPull() {
+  if (!S.currentVault) return;
+  showToast(`☁️ Pulling vault '${S.currentVault}'…`);
+  const res = await api('POST', `/api/vaults/${S.currentVault}/sync/pull`);
+  if (res?.success) {
+    if (res.result?.up_to_date) {
+      showToast(`✅ Vault '${S.currentVault}' is already up-to-date.`);
+    } else {
+      showToast(`✅ Pulled vault '${S.currentVault}' (${res.result?.imported || 0} updated)!`);
+      await loadSecrets();
+    }
+    await loadVaultSyncStatus();
+  } else {
+    showToast(`❌ Pull failed: ${res?.error || 'Server error'}`, 'error');
+  }
+}
+
+async function triggerVaultSync() {
+  if (!S.currentVault) return;
+  showToast(`🔄 Syncing vault '${S.currentVault}'…`);
+  await doVaultPull();
 }
 
 // ------------------------------------------------------------------
