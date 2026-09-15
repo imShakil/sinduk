@@ -1,7 +1,7 @@
 [project]
-name = "sinduk"
+name = "pacli-tool"
 dynamic = ["version"]
-description = "A secure, local-first secrets manager and team vault system."
+description = "pacli-tool has been renamed to sinduk. This transition package installs sinduk."
 readme = "README.md"
 authors = [
     { name = "Mobarak Hosen Shakil", email = "mh.ice.iu@gmail.com" }
@@ -11,82 +11,17 @@ license-files = ["LICENSE"]
 
 requires-python = ">=3.10"
 dependencies = [
-    "cryptography==48.0.0",
-    "click==8.3.3",
-    "requests==2.33.1",
-    "pyperclip==1.11.0",
-    "flask==3.1.3",
-    "flask-socketio==5.6.1",
-    "paramiko==4.0.0",
-    "python-socketio==5.16.1",
-    "backports-tarfile==1.2.0",
-    "bcrypt==5.0.0",
-    "bidict==0.23.1",
-    "blinker==1.9.0",
-    "boolean-py==5.0",
-    "build==1.5.0",
-    "cachecontrol==0.14.4",
-    "certifi==2026.4.22",
-    "cffi==2.0.0",
-    "charset-normalizer==3.4.7",
-    "cyclonedx-python-lib==11.7.0",
-    "defusedxml==0.7.1",
-    "docutils==0.22.4",
-    "filelock==3.29.0",
-    "h11==0.16.0",
-    "id==1.6.1",
-    "idna==3.13",
-    "importlib-metadata==9.0.0",
-    "invoke==3.0.3",
-    "itsdangerous==2.2.0",
-    "jaraco-classes==3.4.0",
-    "jaraco-context==6.1.2",
-    "jaraco-functools==4.4.0",
-    "jinja2==3.1.6",
-    "keyring==25.7.0",
-    "license-expression==30.4.4",
-    "markdown-it-py==4.0.0",
-    "markupsafe==3.0.3",
-    "mdurl==0.1.2",
-    "more-itertools==11.0.2",
-    "msgpack==1.1.2",
-    "nh3==0.3.5",
-    "packageurl-python==0.17.6",
-    "packaging==26.2",
-    "pip-api==0.0.34",
-    "pip-requirements-parser==32.0.1",
-    "pip-audit==2.10.0",
-    "platformdirs==4.9.6",
-    "py-serializable==2.1.0",
-    "pycparser==3.0",
-    "pygments==2.20.0",
-    "pynacl==1.6.2",
-    "pyparsing==3.3.2",
-    "pyproject-hooks==1.2.0",
-    "python-engineio==4.13.1",
-    "readme-renderer==44.0",
-    "requests-toolbelt==1.0.0",
-    "rfc3986==2.0.0",
-    "rich==15.0.0",
-    "simple-websocket==1.1.0",
-    "sortedcontainers==2.4.0",
-    "tomli==2.4.1",
-    "tomli-w==1.2.0",
-    "twine==6.2.0",
-    "typing-extensions==4.15.0",
-    "urllib3==2.6.3",
-    "werkzeug==3.1.8",
-    "wsproto==1.3.2",
-    "zipp==3.23.1",
+    "sinduk>=2.0.0",
 ]
-keywords = ["cli", "secrets", "encryption", "password", "token", "clipboard", "security", "vault", "sinduk"]
+keywords = ["cli", "secrets", "encryption", "password", "token", "clipboard", "security", "vault", "sinduk", "pacli"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
     "Topic :: Security :: Cryptography",
-    "Topic :: Utilities"
+    "Topic :: Utilities",
+    "Development Status :: 7 - Inactive"
 ]
 
 [project.urls]
@@ -103,11 +38,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["sinduk*"]
-exclude = ["ref*", "tests*", "docs*"]
-
-[tool.setuptools.package-data]
-sinduk = ["web/templates/*", "web/static/*"]
+include = ["pacli*"]
+exclude = ["ref*", "tests*", "docs*", "sinduk*"]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"

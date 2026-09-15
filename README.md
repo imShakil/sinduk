@@ -1,18 +1,31 @@
+# ⚠️ `pacli-tool` Has Migrated to `sinduk`
+
+> [!IMPORTANT]
+> **`pacli-tool` has been renamed to [`sinduk`](https://pypi.org/project/sinduk/).**
+>
+> Starting from version 2.0.0, all active development, new features, and security updates are published under the new package name **`sinduk`**.
+>
+> This package (`pacli-tool`) is now a transition/shim package that automatically installs `sinduk>=2.0.0`.
+
+### 🔄 Migration Guide
+
+To install and use `sinduk` directly:
+
+```sh
+pip install sinduk
+```
+
+Or with `pipx`:
+```sh
+pipx install sinduk
+```
+
+> [!TIP]
+> Both `sinduk` and `pacli` CLI commands remain fully supported and interchangeable.
+
+---
+
 # 🔐 sinduk - Secrets Management CLI & Team Vaults
-
-___
-
-[![Build Status](https://github.com/imshakil/sinduk/actions/workflows/release.yml/badge.svg)](https://github.com/imshakil/sinduk/actions)
-[![PyPI version](https://img.shields.io/pypi/v/sinduk.svg)](https://pypi.org/project/sinduk/)
-[![PyPI Downloads](https://img.shields.io/pepy/dt/sinduk?style=flat)](https://pepy.tech/projects/sinduk)
-[![Python Versions](https://img.shields.io/pypi/pyversions/sinduk.svg)](https://pypi.org/project/sinduk/)
-[![License](https://img.shields.io/github/license/imshakil/sinduk)](LICENSE)
-[![security:bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/imShakil/sinduk)
-
-**sinduk** (*সিন্দুক* — the traditional Bengali word for a secure treasure chest or heirloom vault) is a secure, local-first secrets manager and team vault system designed for developers and DevOps teams. Store, retrieve, sync, and share passwords, API tokens, and SSH credentials with strong cryptography, master password verification, role-based permissions, and zero-knowledge synchronization.
-
-> [!NOTE]
-> Formerly known as `pacli` (`pacli-tool`). The `pacli` command remains supported as an alias for seamless backward compatibility with existing workflows and automations.
 
 ---
 
