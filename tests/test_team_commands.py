@@ -27,7 +27,7 @@ def isolated_pacli_dir(tmp_path, monkeypatch):
     monkeypatch.setattr("sinduk.store.SALT_PATH", store_salt_path)
     monkeypatch.setattr("sinduk.store.PASSWORD_HASH_PATH", store_hash_path)
 
-    yield test_config
+    return test_config
 
 
 @pytest.fixture

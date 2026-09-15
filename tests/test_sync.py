@@ -26,8 +26,9 @@ def isolated_pacli_dir(tmp_path, monkeypatch):
     store_hash_path = os.path.join(test_config, "password_hash.bin")
     monkeypatch.setattr("sinduk.store.SALT_PATH", store_salt_path)
     monkeypatch.setattr("sinduk.store.PASSWORD_HASH_PATH", store_hash_path)
+    monkeypatch.setattr("sinduk.sync_client.SYNC_CONFIG_PATH", os.path.join(test_config, "sync_config.json"))
 
-    yield test_config
+    return test_config
 
 
 @pytest.fixture
@@ -70,6 +71,7 @@ class TestVaultBackupExportImport:
         secrets = vm.list_secrets("sync-vault-2")
         assert len(secrets) == 2
         sec1 = vm.get_secret("sync-vault-2", secrets[0][0], master_fernet)
+        assert sec1 is not None
         assert sec1["secret"] in ["secret-token-val", "user:pass123"]
 
         # 3. Test duplicate import with merge=True (default: skip duplicates)
@@ -129,3 +131,48 @@ class TestSyncCliCommands:
         res = runner.invoke(cli, ["sync", "pull", "team-missing", "--from", shared_dir, "--password", "testpass"])
         assert res.exit_code == 0
         assert "File not found" in res.output
+
+
+class TestAutoSyncHelpers:
+    def test_auto_push_no_config(self, isolated_pacli_dir, master_fernet, user_identity):
+        from sinduk.sync_client import auto_push_vault, auto_pull_vault
+
+        vm = VaultManager()
+        vm.create_vault("auto-vault", master_fernet=master_fernet)
+
+        # Without config, auto-push returns no_config without error
+        res = auto_push_vault("auto-vault", master_fernet)
+        assert res["synced"] is False
+        assert res["reason"] == "no_config"
+
+        # Without config, auto-pull returns no_config without error
+        pull_res = auto_pull_vault("auto-vault", master_fernet)
+        assert pull_res["synced"] is False
+        assert pull_res["reason"] == "no_config"
+
+    def test_validate_sync_server_invalid_url(self):
+        from sinduk.sync_client import validate_sync_server
+
+        res = validate_sync_server("not-a-url")
+        assert res["ok"] is False
+        assert "Invalid URL format" in res["error"]
+
+    def test_validate_sync_server_unreachable(self):
+        from sinduk.sync_client import validate_sync_server
+
+        res = validate_sync_server("http://127.0.0.1:59999", timeout=1)
+        assert res["ok"] is False
+        assert "Could not connect" in res["error"]
+
+    def test_sync_config_set_validation_failure(self, runner, isolated_pacli_dir):
+        # Setting unreachable server fails and does not save
+        res = runner.invoke(cli, ["sync", "config", "set", "--server", "http://127.0.0.1:59999"])
+        assert res.exit_code == 0
+        assert "Connection test failed" in res.output
+        assert "Configuration was NOT saved" in res.output
+
+    def test_sync_config_set_force(self, runner, isolated_pacli_dir):
+        # With --force it saves despite being offline
+        res = runner.invoke(cli, ["sync", "config", "set", "--server", "http://127.0.0.1:59999", "--force"])
+        assert res.exit_code == 0
+        assert "Sync configuration updated" in res.output

@@ -42,6 +42,7 @@ def create_app():
     _register_ssh_rest_routes(app, store, ssh_manager, require_auth)
     _register_socket_handlers(socketio, store, ssh_manager)
     _register_vault_routes(app, store, vault_manager, require_auth)
+    _register_sync_routes(app, store, vault_manager, require_auth)
 
     return app, socketio
 
@@ -740,9 +741,7 @@ def _register_vault_routes(app, store, vault_manager, require_auth):
     _register_vault_audit_routes(app, vault_manager, require_auth)
 
 
-def _register_vault_crud_routes(app, store, vault_manager, require_auth):
-    """Register vault CRUD endpoints."""
-
+def _register_list_vaults_route(app, vault_manager, require_auth):
     @app.route("/api/vaults", methods=["GET"])
     @require_auth
     def list_vaults():
@@ -753,6 +752,8 @@ def _register_vault_crud_routes(app, store, vault_manager, require_auth):
             logger.error(f"Error listing vaults: {e}")
             return jsonify({"error": str(e)}), 500
 
+
+def _register_create_vault_route(app, store, vault_manager, require_auth):
     @app.route("/api/vaults", methods=["POST"])
     @require_auth
     def create_vault():
@@ -763,6 +764,9 @@ def _register_vault_crud_routes(app, store, vault_manager, require_auth):
             if not name:
                 return jsonify({"error": "Vault name is required"}), 400
             meta = vault_manager.create_vault(name, description=description, master_fernet=store.fernet)
+            from ..sync_client import auto_push_vault
+
+            auto_push_vault(name, store.fernet)
             return jsonify({"success": True, "vault": meta}), 201
         except (ValueError, RuntimeError) as e:
             return jsonify({"error": str(e)}), 400
@@ -770,6 +774,8 @@ def _register_vault_crud_routes(app, store, vault_manager, require_auth):
             logger.error(f"Error creating vault: {e}")
             return jsonify({"error": str(e)}), 500
 
+
+def _register_get_vault_route(app, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>", methods=["GET"])
     @require_auth
     def get_vault(vault_name):
@@ -782,6 +788,8 @@ def _register_vault_crud_routes(app, store, vault_manager, require_auth):
         except PermissionError as e:
             return jsonify({"error": str(e)}), 403
 
+
+def _register_delete_vault_route(app, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>", methods=["DELETE"])
     @require_auth
     def delete_vault(vault_name):
@@ -797,13 +805,21 @@ def _register_vault_crud_routes(app, store, vault_manager, require_auth):
             return jsonify({"error": str(e)}), 500
 
 
+def _register_vault_crud_routes(app, store, vault_manager, require_auth):
+    """Register vault CRUD endpoints."""
+    _register_list_vaults_route(app, vault_manager, require_auth)
+    _register_create_vault_route(app, store, vault_manager, require_auth)
+    _register_get_vault_route(app, vault_manager, require_auth)
+    _register_delete_vault_route(app, vault_manager, require_auth)
+
+
 def _register_vault_secrets_routes(app, store, vault_manager, require_auth):
     """Register vault secrets endpoints."""
     _register_list_vault_secrets_route(app, vault_manager, require_auth)
     _register_create_vault_secret_route(app, store, vault_manager, require_auth)
     _register_reveal_vault_secret_route(app, store, vault_manager, require_auth)
     _register_update_vault_secret_route(app, store, vault_manager, require_auth)
-    _register_delete_vault_secret_route(app, vault_manager, require_auth)
+    _register_delete_vault_secret_route(app, store, vault_manager, require_auth)
 
 
 def _register_list_vault_secrets_route(app, vault_manager, require_auth):
@@ -834,6 +850,9 @@ def _register_create_vault_secret_route(app, store, vault_manager, require_auth)
             if secret_type not in ("password", "token", "ssh"):
                 return jsonify({"error": "Invalid secret type"}), 400
             vault_manager.save_secret(vault_name, label, secret, secret_type, store.fernet)
+            from ..sync_client import auto_push_vault
+
+            auto_push_vault(vault_name, store.fernet)
             return jsonify({"success": True, "message": "Secret created in vault"}), 201
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
@@ -874,6 +893,9 @@ def _register_update_vault_secret_route(app, store, vault_manager, require_auth)
             if not secret:
                 return jsonify({"error": "Secret value is required"}), 400
             vault_manager.update_secret(vault_name, secret_id, secret, store.fernet)
+            from ..sync_client import auto_push_vault
+
+            auto_push_vault(vault_name, store.fernet)
             return jsonify({"success": True, "message": "Secret updated"})
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
@@ -882,12 +904,16 @@ def _register_update_vault_secret_route(app, store, vault_manager, require_auth)
             return jsonify({"error": str(e)}), 500
 
 
-def _register_delete_vault_secret_route(app, vault_manager, require_auth):
+def _register_delete_vault_secret_route(app, store, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>/secrets/<secret_id>", methods=["DELETE"])
     @require_auth
     def delete_vault_secret(vault_name, secret_id):
         try:
             vault_manager.delete_secret(vault_name, secret_id)
+            if store.fernet:
+                from ..sync_client import auto_push_vault
+
+                auto_push_vault(vault_name, store.fernet)
             return jsonify({"success": True, "message": "Secret deleted"})
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
@@ -901,7 +927,7 @@ def _register_vault_members_routes(app, store, vault_manager, require_auth):
     _register_list_vault_members_route(app, vault_manager, require_auth)
     _register_add_vault_member_route(app, store, vault_manager, require_auth)
     _register_remove_vault_member_route(app, store, vault_manager, require_auth)
-    _register_set_vault_member_role_route(app, vault_manager, require_auth)
+    _register_set_vault_member_role_route(app, store, vault_manager, require_auth)
     _register_vault_crypto_routes(app, store, vault_manager, require_auth)
 
 
@@ -940,6 +966,9 @@ def _register_add_vault_member_route(app, store, vault_manager, require_auth):
                 store.fernet,
                 target_public_key=public_key,
             )
+            from ..sync_client import auto_push_vault
+
+            auto_push_vault(vault_name, store.fernet)
             return (
                 jsonify({"success": True, "message": f"Added {user_name} as {role}"}),
                 201,
@@ -959,6 +988,10 @@ def _register_remove_vault_member_route(app, store, vault_manager, require_auth)
             data = request.get_json(silent=True) or {}
             rotate_key = data.get("rotate_key", True)
             vault_manager.remove_member(vault_name, user_id, master_fernet=store.fernet, rotate_key=rotate_key)
+            if store.fernet:
+                from ..sync_client import auto_push_vault
+
+                auto_push_vault(vault_name, store.fernet)
             return jsonify({"success": True, "message": "Member removed"})
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
@@ -966,7 +999,7 @@ def _register_remove_vault_member_route(app, store, vault_manager, require_auth)
             return jsonify({"error": str(e)}), 500
 
 
-def _register_set_vault_member_role_route(app, vault_manager, require_auth):
+def _register_set_vault_member_role_route(app, store, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>/members/<user_id>/role", methods=["PUT"])
     @require_auth
     def set_vault_member_role(vault_name, user_id):
@@ -976,6 +1009,10 @@ def _register_set_vault_member_role_route(app, vault_manager, require_auth):
             if not role:
                 return jsonify({"error": "Role is required"}), 400
             vault_manager.set_member_role(vault_name, user_id, role)
+            if store.fernet:
+                from ..sync_client import auto_push_vault
+
+                auto_push_vault(vault_name, store.fernet)
             return jsonify({"success": True, "message": f"Role updated to {role}"})
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
@@ -983,12 +1020,15 @@ def _register_set_vault_member_role_route(app, vault_manager, require_auth):
             return jsonify({"error": str(e)}), 500
 
 
-def _register_vault_crypto_routes(app, store, vault_manager, require_auth):
+def _register_rotate_vault_key_route(app, store, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>/rotate-key", methods=["POST"])
     @require_auth
     def rotate_vault_key_route(vault_name):
         try:
             res = vault_manager.rotate_vault_key(vault_name, store.fernet)
+            from ..sync_client import auto_push_vault
+
+            auto_push_vault(vault_name, store.fernet)
             return jsonify({"success": True, "details": res})
         except (PermissionError, ValueError) as e:
             return jsonify({"error": str(e)}), 403
@@ -996,6 +1036,8 @@ def _register_vault_crypto_routes(app, store, vault_manager, require_auth):
             logger.error(f"Error rotating vault key: {e}")
             return jsonify({"error": str(e)}), 500
 
+
+def _register_create_vault_invite_route(app, store, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>/invite", methods=["POST"])
     @require_auth
     def create_vault_invite_route(vault_name):
@@ -1018,6 +1060,8 @@ def _register_vault_crypto_routes(app, store, vault_manager, require_auth):
             logger.error(f"Error creating vault invite: {e}")
             return jsonify({"error": str(e)}), 500
 
+
+def _register_accept_vault_invite_route(app, store, vault_manager, require_auth):
     @app.route("/api/vaults/accept-invite", methods=["POST"])
     @require_auth
     def accept_vault_invite_route():
@@ -1035,9 +1079,13 @@ def _register_vault_crypto_routes(app, store, vault_manager, require_auth):
             return jsonify({"error": str(e)}), 500
 
 
-def _register_vault_audit_routes(app, vault_manager, require_auth):
-    """Register vault audit and identity endpoints."""
+def _register_vault_crypto_routes(app, store, vault_manager, require_auth):
+    _register_rotate_vault_key_route(app, store, vault_manager, require_auth)
+    _register_create_vault_invite_route(app, store, vault_manager, require_auth)
+    _register_accept_vault_invite_route(app, store, vault_manager, require_auth)
 
+
+def _register_vault_audit_log_route(app, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>/audit", methods=["GET"])
     @require_auth
     def vault_audit_log(vault_name):
@@ -1055,6 +1103,8 @@ def _register_vault_audit_routes(app, vault_manager, require_auth):
             logger.error(f"Error getting audit log: {e}")
             return jsonify({"error": str(e)}), 500
 
+
+def _register_vault_identity_route(app, vault_manager, require_auth):
     @app.route("/api/vaults/<vault_name>/identity", methods=["GET"])
     @require_auth
     def vault_identity(vault_name):
@@ -1075,3 +1125,127 @@ def _register_vault_audit_routes(app, vault_manager, require_auth):
                 "role": my_role,
             }
         )
+
+
+def _register_vault_audit_routes(app, vault_manager, require_auth):
+    """Register vault audit and identity endpoints."""
+    _register_vault_audit_log_route(app, vault_manager, require_auth)
+    _register_vault_identity_route(app, vault_manager, require_auth)
+
+
+def _check_server_health(server_url):
+    """Check if the sync server health endpoint is responding."""
+    if not server_url:
+        return False
+    try:
+        import requests
+
+        r = requests.get(f"{server_url}/health", timeout=2)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
+def _mask_token(token):
+    """Return a masked representation of a bearer token."""
+    if not token:
+        return ""
+    if len(token) > 8:
+        return token[:8] + "..."
+    return "(set)"
+
+
+def _register_get_sync_config_route(app, require_auth):
+    @app.route("/api/sync/config", methods=["GET"])
+    @require_auth
+    def get_sync_config_route():
+        from ..sync_client import resolve_server_params
+
+        server_url, token = resolve_server_params()
+        connected = _check_server_health(server_url) if (server_url and token) else False
+        return jsonify(
+            {
+                "server_url": server_url or "",
+                "has_token": bool(token),
+                "token_masked": _mask_token(token),
+                "connected": connected,
+            }
+        )
+
+
+def _register_set_sync_config_route(app, require_auth):
+    @app.route("/api/sync/config", methods=["POST"])
+    @require_auth
+    def set_sync_config_route():
+        from ..sync_client import set_sync_config
+
+        data = request.get_json() or {}
+        server_url = data.get("server_url", "").strip() or None
+        token = data.get("token", "").strip() or None
+        cfg = set_sync_config(server_url=server_url, token=token)
+        return jsonify({"success": True, "config": {"server_url": cfg.get("server_url", "")}})
+
+
+def _register_sync_push_route(app, store, require_auth):
+    @app.route("/api/vaults/<vault_name>/sync/push", methods=["POST"])
+    @require_auth
+    def sync_push_route(vault_name):
+        from ..sync_client import auto_push_vault
+
+        try:
+            res = auto_push_vault(vault_name, store.fernet)
+            if res.get("synced"):
+                return jsonify({"success": True, "result": res})
+            reason = res.get("reason", "error")
+            err = res.get("error", "Sync server not configured or unreachable")
+            return jsonify({"success": False, "reason": reason, "error": err}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+
+def _register_sync_pull_route(app, store, require_auth):
+    @app.route("/api/vaults/<vault_name>/sync/pull", methods=["POST"])
+    @require_auth
+    def sync_pull_route(vault_name):
+        from ..sync_client import auto_pull_vault
+
+        try:
+            data = request.get_json(silent=True) or {}
+            overwrite = data.get("overwrite", False)
+            res = auto_pull_vault(vault_name, store.fernet, overwrite=overwrite)
+            if res.get("synced"):
+                return jsonify({"success": True, "result": res})
+            reason = res.get("reason", "error")
+            err = res.get("error", "Sync server not configured or unreachable")
+            return jsonify({"success": False, "reason": reason, "error": err}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+
+def _register_sync_status_route(app, vault_manager, require_auth):
+    @app.route("/api/vaults/<vault_name>/sync/status", methods=["GET"])
+    @require_auth
+    def sync_status_route(vault_name):
+        from ..sync_client import resolve_server_params, get_server_status
+
+        try:
+            local_st = vault_manager.get_sync_status(vault_name) or {}
+            server_url, token = resolve_server_params()
+            server_st = None
+            if server_url and token:
+                try:
+                    server_st = get_server_status(vault_name, server_url, token)
+                except Exception as e:
+                    server_st = {"error": str(e)}
+            return jsonify({"local": local_st, "server": server_st})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+
+def _register_sync_routes(app, store, vault_manager, require_auth):
+    """Register sync configuration and manual sync trigger endpoints."""
+    _register_get_sync_config_route(app, require_auth)
+    _register_set_sync_config_route(app, require_auth)
+    _register_sync_push_route(app, store, require_auth)
+    _register_sync_pull_route(app, store, require_auth)
+    _register_sync_status_route(app, vault_manager, require_auth)

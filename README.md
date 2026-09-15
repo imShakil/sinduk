@@ -63,22 +63,22 @@ sinduk --help
 
 | Command / Group | Description |
 |---|---|
-| `init` | Set or reset your master password |
-| `add` | Add a secret (`--pass`, `--token`, `--ssh`) with optional `--vault` |
-| `get` / `get-by-id` | Retrieve secrets by label or ID (`--clip` to copy) |
+| `init` | (Optional) Explicitly set or reset the master password |
+| `add` | Add a secret (auto-detects token/password/ssh, or `--type`) with optional `--vault` |
+| `get` | Retrieve secrets by label or ID (`--clip` to copy) |
 | `list` | List all saved secrets (supports `--vault`) |
-| `update` / `update-by-id` | Update an existing secret value |
-| `delete` / `delete-by-id` | Delete a secret |
+| `update` | Update a secret by label or ID |
+| `delete` | Delete a secret by label or ID (`-y` to skip confirmation prompt) |
+| `passwd` | Change the master password without losing secrets (re-encrypts store) |
 | `team` | 👥 Team vault management (create vaults, add members, audit log) |
 | `sync` | 🔄 Sync encrypted vaults with a team relay server or shared directory |
 | `server` | 🖥️ Start, stop, and manage the self-hosted zero-knowledge sync server |
-| `backup` | 📦 Encrypted backup export and import across machines |
-| `web` | 🌐 Launch or manage the local Web UI dashboard |
-| `ssh` | Connect to an SSH server using saved credentials |
-| `export` | Export secrets to unencrypted JSON or CSV |
+| `backup` | 📦 Encrypted backup — export and import secrets across devices |
+| `web` | 🌐 Launch and manage the local Web UI dashboard |
+| `ssh` | 🔑 Connect to SSH server using saved credentials |
+| `export` | Export secrets to JSON or CSV format |
 | `short` | Shorten URLs via LinklyHQ |
-| `cc` | Copy stdin / pipeline output to clipboard |
-| `change-master-key` | Re-encrypt all secrets with a new master password |
+| `cc` | 📋 Copy stdin / pipeline output to clipboard |
 | `version` | Show sinduk version and project details |
 
 ---
@@ -121,9 +121,9 @@ Available roles:
 ### 4. Working with Secrets in Team Vaults
 Simply pass `--vault <name>` or `-v <name>` to any secret command:
 ```sh
-# Add a secret to the team vault
-sinduk add --vault dev-infra --password postgres_db postgres db_pass_secret
-sinduk add --vault dev-infra --token stripe_key sk_test_12345
+# Add a secret to the team vault (using --type or auto-detection)
+sinduk add --vault dev-infra --type password postgres_db postgres db_pass_secret
+sinduk add --vault dev-infra --type token stripe_key sk_test_12345
 
 # List secrets in the team vault
 sinduk list --vault dev-infra

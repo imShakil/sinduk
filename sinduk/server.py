@@ -248,6 +248,20 @@ def _register_sync_server_routes(app: Flask, db: SyncServerDB, require_token):
     def health():
         return jsonify({"status": "ok", "service": "sinduk-sync-server"})
 
+    @app.route("/api/v1/auth/verify", methods=["GET"])
+    @require_token
+    def verify_auth():
+        token_info = getattr(g, "token_info", {})
+        return jsonify(
+            {
+                "valid": True,
+                "token_id": token_info.get("id"),
+                "name": token_info.get("name"),
+                "role": token_info.get("role"),
+                "service": "sinduk-sync-server",
+            }
+        )
+
     @app.route("/api/v1/sync/push/<vault_name>", methods=["POST"])
     @require_token
     def push_blob(vault_name):
@@ -328,7 +342,7 @@ def create_sync_server_app(db: SyncServerDB | None = None) -> Flask:
     if db is None:
         db = SyncServerDB()
 
-    app = Flask("sinduk_sync_server")
+    app = Flask("sinduk_sync_server")  # NOSONAR - python:S4502: Stateless REST API using Bearer token auth
     require_token = _build_require_token(db)
     _register_sync_server_routes(app, db, require_token)
     return app

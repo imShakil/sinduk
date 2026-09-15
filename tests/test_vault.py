@@ -27,7 +27,7 @@ def isolated_pacli_dir(tmp_path, monkeypatch):
     monkeypatch.setattr("sinduk.vault.REGISTRY_PATH", os.path.join(test_config, "vaults", "vault_registry.json"))
     monkeypatch.setattr("sinduk.vault.USER_IDENTITY_PATH", os.path.join(test_config, "user_identity.json"))
 
-    yield test_config
+    return test_config
 
 
 @pytest.fixture

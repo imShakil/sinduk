@@ -63,6 +63,103 @@ def resolve_server_params(server_url: str | None = None, token: str | None = Non
     return res_server, res_token
 
 
+def _normalize_and_validate_server_url(server_url: str) -> tuple[str | None, str | None]:
+    """Validate server URL format and return the normalized base URL or an error message."""
+    if not server_url:
+        return None, "Server URL is required."
+    parsed = urllib.parse.urlparse(server_url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return (
+            None,
+            f"Invalid URL format: '{server_url}'.Must start with http:// or https:// (e.g. http://sinduk.example.com)",
+        )
+    return f"{parsed.scheme}://{parsed.netloc}{parsed.path.rstrip('/')}", None
+
+
+def _check_server_connectivity(base_url: str, timeout: int) -> str | None:
+    """Perform health check on server. Returns error string if unsuccessful, None if connected."""
+    try:
+        resp = requests.get(f"{base_url}/health", timeout=timeout)
+        if resp.status_code != 200:
+            return f"Server responded with HTTP {resp.status_code} at {base_url}/health."
+        return None
+    except requests.exceptions.RequestException as e:
+        return f"Could not connect to sync server at {base_url}: {e}"
+
+
+def _verify_server_token(base_url: str, token: str, timeout: int) -> tuple[bool, dict | None, str | None]:
+    """
+    Verify bearer token validity against the server.
+    Returns (token_valid, token_info, error_message).
+    """
+    try:
+        auth_resp = requests.get(
+            f"{base_url}/api/v1/auth/verify",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=timeout,
+        )
+        if auth_resp.status_code == 200:
+            return True, auth_resp.json(), None
+        if auth_resp.status_code in (401, 403):
+            return False, None, "Server connected, but the provided token was rejected (invalid or revoked)."
+        if auth_resp.status_code == 404:
+            # Fallback check against a protected endpoint on older/running server versions
+            ping_resp = requests.get(
+                f"{base_url}/api/v1/sync/status/_ping_",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=timeout,
+            )
+            if ping_resp.status_code in (401, 403):
+                return False, None, "Server connected, but the provided token was rejected (invalid or revoked)."
+            return True, None, None
+        return True, None, None
+    except requests.exceptions.RequestException as e:
+        logger.debug(f"Auth verify request failed: {e}")
+        return True, None, None
+
+
+def validate_sync_server(server_url: str, token: str | None = None, timeout: int = 4) -> dict:
+    """
+    Actively validate server connectivity and bearer token.
+
+    Returns:
+        {
+            "ok": bool,
+            "connected": bool,
+            "token_valid": bool | None,
+            "token_info": dict | None,
+            "error": str | None,
+        }
+    """
+    base, err = _normalize_and_validate_server_url(server_url)
+    if err or not base:
+        return {"ok": False, "connected": False, "error": err or "Server URL is required."}
+
+    conn_err = _check_server_connectivity(base, timeout=timeout)
+    if conn_err:
+        return {"ok": False, "connected": False, "error": conn_err}
+
+    token_info = None
+    token_valid = None
+    if token:
+        token_valid, token_info, token_err = _verify_server_token(base, token, timeout=timeout)
+        if token_err:
+            return {
+                "ok": False,
+                "connected": True,
+                "token_valid": False,
+                "error": token_err,
+            }
+
+    return {
+        "ok": True,
+        "connected": True,
+        "token_valid": token_valid,
+        "token_info": token_info,
+        "error": None,
+    }
+
+
 def _build_api_url(server_url: str, endpoint: str, vault_name: str) -> str:
     """Validate server URL and safely construct API endpoint."""
     parsed = urllib.parse.urlparse(server_url)
@@ -147,3 +244,83 @@ def get_server_status(vault_name: str, server_url: str, token: str) -> dict:
     except Exception:
         err = resp.text
     raise RuntimeError(f"Server status check failed ({resp.status_code}): {err}")
+
+
+def auto_push_vault(vault_name: str, store_fernet) -> dict:
+    """
+    Attempt to push the vault to the configured sync server automatically in the background.
+
+    Returns:
+        {"synced": True, "version": int, "checksum": str, "updated": bool}
+        or {"synced": False, "reason": "no_config" | "error", "error": str}
+    """
+    server_url, token = resolve_server_params()
+    if not server_url or not token:
+        return {"synced": False, "reason": "no_config"}
+
+    try:
+        import time
+        from .vault import VaultManager, get_user_identity
+
+        vm = VaultManager()
+        blob = vm.export_vault_backup(vault_name, token, store_fernet)
+        identity = get_user_identity()
+        user_name = identity.get("user_name", "")
+        res = push_to_server(vault_name, blob, server_url, token, user_name=user_name)
+        vm.update_sync_status(
+            vault_name,
+            last_push_at=int(time.time()),
+            last_push_version=res.get("version"),
+            last_push_checksum=res.get("checksum"),
+        )
+        return {
+            "synced": True,
+            "version": res.get("version"),
+            "checksum": res.get("checksum"),
+            "updated": res.get("updated", True),
+        }
+    except Exception as e:
+        logger.warning(f"Auto-push failed for vault '{vault_name}': {e}")
+        return {"synced": False, "reason": "error", "error": str(e)}
+
+
+def auto_pull_vault(vault_name: str, store_fernet, overwrite: bool = False) -> dict:
+    """
+    Attempt to pull latest changes for the vault from the configured sync server automatically.
+
+    Returns:
+        {"synced": True, "imported": int, "skipped": int, "version": int}
+        or {"synced": False, "reason": "no_config" | "up_to_date" | "error", "error": str}
+    """
+    server_url, token = resolve_server_params()
+    if not server_url or not token:
+        return {"synced": False, "reason": "no_config"}
+
+    try:
+        import time
+        from .vault import VaultManager
+
+        vm = VaultManager()
+        local_st = vm.get_sync_status(vault_name) or {}
+        local_checksum = local_st.get("last_pull_checksum") or local_st.get("last_push_checksum") or ""
+
+        blob, meta = pull_from_server(vault_name, server_url, token, if_none_match=local_checksum)
+        if meta.get("not_modified") or blob is None:
+            return {"synced": True, "up_to_date": True, "version": local_st.get("last_pull_version")}
+
+        stats = vm.import_vault_backup(vault_name, blob, token, store_fernet, merge=not overwrite)
+        vm.update_sync_status(
+            vault_name,
+            last_pull_at=int(time.time()),
+            last_pull_version=meta.get("version"),
+            last_pull_checksum=meta.get("checksum"),
+        )
+        return {
+            "synced": True,
+            "imported": stats.get("imported", 0),
+            "skipped": stats.get("skipped", 0),
+            "version": meta.get("version"),
+        }
+    except Exception as e:
+        logger.warning(f"Auto-pull failed for vault '{vault_name}': {e}")
+        return {"synced": False, "reason": "error", "error": str(e)}
