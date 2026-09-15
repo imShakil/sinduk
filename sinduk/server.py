@@ -478,8 +478,6 @@ def _register_user_auth_routes(app: Flask, db: SyncServerDB):
                 enc_private_key=enc_private_key,
             )
             return jsonify({"success": True, "token": token, "user": user}), 201
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 409
         except Exception as e:
             logger.error(f"Error registering user: {e}")
             return jsonify({"error": str(e)}), 500

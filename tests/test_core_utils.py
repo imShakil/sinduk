@@ -76,36 +76,6 @@ def test_master_password_required_allows_and_blocks(monkeypatch):
     assert called["count"] == 1
 
 
-def test_linkly_shorten_success(monkeypatch):
-    from sinduk.linklyhq import LinklyHQ
-    import sinduk.linklyhq as linkly
-
-    class FakeResponse:
-        def raise_for_status(self):
-            return None
-
-        def json(self):
-            return {"full_url": "https://sho.rt/x"}
-
-    monkeypatch.setattr(linkly.requests, "post", lambda *args, **kwargs: FakeResponse())
-
-    client = LinklyHQ("k", "wid")
-    assert client.shorten("https://example.com", name="demo") == "https://sho.rt/x"
-
-
-def test_linkly_shorten_request_error(monkeypatch):
-    from sinduk.linklyhq import LinklyHQ
-    import sinduk.linklyhq as linkly
-
-    def raise_request_error(*args, **kwargs):
-        raise linkly.requests.exceptions.RequestException("network")
-
-    monkeypatch.setattr(linkly.requests, "post", raise_request_error)
-
-    client = LinklyHQ("k", "wid")
-    assert client.shorten("https://example.com") is None
-
-
 def test_parse_and_suggest_ssh_hosts(monkeypatch, tmp_path):
     from sinduk import ssh_utils
 
@@ -161,7 +131,6 @@ def test_cli_registers_expected_commands():
         "delete-by-id",
         "ssh",
         "export",
-        "short",
         "cc",
         "backup",
         "web",

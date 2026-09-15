@@ -26,7 +26,6 @@ ___
 - 💻 **Modern Web UI**: Interactive browser dashboard (`sinduk web`) featuring a Vault Switcher, Secrets CRUD, Team Member Management, Audit Log Viewer, and an in-browser SSH Terminal.
 - 🔑 **SSH Key Management**: Store and auto-connect to SSH servers using credentials or key files.
 - 📋 **Clipboard & Pipeline Integration**: Copy secrets directly to clipboard (`--clip`) or pipe command outputs (`sinduk cc`).
-- 🔗 **LinklyHQ URL Shortening**: Built-in shortlink generator with click tracking.
 
 ---
 
@@ -79,7 +78,6 @@ sinduk --help
 | `web` | 🌐 Launch and manage the local Web UI dashboard |
 | `ssh` | 🔑 Connect to SSH server using saved credentials |
 | `export` | Export secrets to JSON or CSV format |
-| `short` | Shorten URLs via LinklyHQ |
 | `cc` | 📋 Copy stdin / pipeline output to clipboard |
 | `version` | Show sinduk version and project details |
 

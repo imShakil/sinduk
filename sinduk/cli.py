@@ -4,7 +4,7 @@ import click
 from .commands.admin import init, passwd, change_master_key, version
 from .commands.secrets import add, get, get_by_id, list, update, update_by_id, delete, delete_by_id
 from .commands.ssh import ssh
-from .commands.utils import export, short, cc
+from .commands.utils import export, cc
 from .commands.backup import backup
 from .commands.web import web
 from .commands.team import team
@@ -54,7 +54,6 @@ cli.add_command(ssh)
 
 # Utils
 cli.add_command(export)
-cli.add_command(short)
 cli.add_command(cc)
 
 # Backup
