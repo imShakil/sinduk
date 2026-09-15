@@ -24,13 +24,23 @@ def get_sync_config() -> dict:
     return {}
 
 
-def set_sync_config(server_url: str | None = None, token: str | None = None) -> dict:
+def set_sync_config(
+    server_url: str | None = None,
+    token: str | None = None,
+    clear: bool = False,
+) -> dict:
     """Save local sync configuration."""
-    config = get_sync_config()
+    config = {} if clear else get_sync_config()
     if server_url is not None:
-        config["server_url"] = server_url.rstrip("/")
+        if server_url == "":
+            config.pop("server_url", None)
+        else:
+            config["server_url"] = server_url.rstrip("/")
     if token is not None:
-        config["token"] = token
+        if token == "":
+            config.pop("token", None)
+        else:
+            config["token"] = token
 
     os.makedirs(os.path.dirname(SYNC_CONFIG_PATH), exist_ok=True)
     with open(SYNC_CONFIG_PATH, "w") as f:

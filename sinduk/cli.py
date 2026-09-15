@@ -10,6 +10,7 @@ from .commands.web import web
 from .commands.team import team
 from .commands.sync import sync
 from .commands.server import server
+from .commands.login import login_cmd as login, logout_cmd as logout
 
 
 from . import __version__
@@ -70,3 +71,7 @@ cli.add_command(sync)
 
 # Server (Option B - Self-hosted sync relay)
 cli.add_command(server)
+
+# Auth
+cli.add_command(login)
+cli.add_command(logout)
