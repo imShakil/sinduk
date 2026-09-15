@@ -139,7 +139,9 @@ sinduk team audit-log dev-infra
 
 ## 🔄 Syncing Vaults Across the Team
 
-### Option A: Self-Hosted Zero-Knowledge Relay Server
+Sinduk offers seamless zero-knowledge synchronization across team members with **automatic background push**, live server verification, and offline directory fallback.
+
+### Option A: Self-Hosted Zero-Knowledge Relay Server (Recommended)
 
 #### 1. Start the Sync Server (DevOps / Admin)
 Run on any Linux server, VPS, or cloud container:
@@ -152,22 +154,36 @@ sinduk server token create --name "DevTeam" --role admin
 ```
 
 #### 2. Configure Team Members
-Each team member configures their client once:
+Each team member configures their client once. Sinduk actively verifies server connectivity and bearer token validity before saving:
 ```sh
 sinduk sync config set --server http://secrets.mycompany.internal:58380 --token sinduk_tok_...
 ```
+*(Tip: Use `--force` to save configuration offline without live network checks).*
 
-#### 3. Push and Pull Updates
+#### 3. Automatic Background Sync ⚡
+Once configured, **all team vault changes are pushed automatically** whenever you modify secrets or membership:
+- `sinduk add --vault dev-infra ...` ➡️ *Auto-pushed to server*
+- `sinduk update --vault dev-infra ...` ➡️ *Auto-pushed to server*
+- `sinduk delete --vault dev-infra ...` ➡️ *Auto-pushed to server*
+- `sinduk team add-member dev-infra ...` ➡️ *Auto-pushed to server*
+
+#### 4. Manual Push, Pull, and Status
+You can also manually synchronize or check remote vault versions at any time:
 ```sh
 # Push local vault updates to the server
 sinduk sync push dev-infra
 
-# Check status of remote vault
+# Check status of remote vault vs local vault
 sinduk sync status dev-infra
 
 # Pull and merge latest changes from the server
 sinduk sync pull dev-infra
 ```
+
+#### 5. Web UI Sync Controls 🌐
+When using the browser dashboard (`sinduk web`):
+- Click **"Sync Server"** in the top navigation bar to configure server URL and bearer token with live connection testing.
+- Use the **"🔄 Sync"** 1-click button on any team vault card to instantly pull and push changes.
 
 ---
 
