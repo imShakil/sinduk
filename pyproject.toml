@@ -55,7 +55,7 @@ dependencies = [
     "packaging==26.2",
     "pip-api==0.0.34",
     "pip-requirements-parser==32.0.1",
-    "pip-audit==2.10.0",
+    "pip-audit==2.10.1",
     "platformdirs==4.9.6",
     "py-serializable==2.1.0",
     "pycparser==3.0",
