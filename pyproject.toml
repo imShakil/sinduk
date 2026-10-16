@@ -50,7 +50,7 @@ dependencies = [
     "mdurl==0.1.2",
     "more-itertools==11.0.2",
     "msgpack==1.1.2",
-    "nh3==0.3.5",
+    "nh3==0.3.7",
     "packageurl-python==0.17.6",
     "packaging==26.2",
     "pip-api==0.0.34",
